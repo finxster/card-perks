@@ -94,7 +94,7 @@ export default function Dashboard() {
 
   const editPerkMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Perk> }) => {
-      return await apiRequest(`/api/perks/${id}`, 'PATCH', data);
+      return await apiRequest('PATCH', `/api/perks/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
@@ -115,7 +115,7 @@ export default function Dashboard() {
 
   const deletePerkMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/perks/${id}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/perks/${id}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
