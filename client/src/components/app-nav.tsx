@@ -1,0 +1,101 @@
+import { useAuth } from '@/lib/auth';
+import { Link, useLocation } from 'wouter';
+import { Button } from '@/components/ui/button';
+import { ThemeToggle } from './theme-toggle';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut } from 'lucide-react';
+
+export function AppNav() {
+  const { user, logout } = useAuth();
+  const [location] = useLocation();
+
+  if (!user) return null;
+
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/household', label: 'Household', icon: Home },
+    { path: '/crowdsource', label: 'Suggest', icon: TrendingUp },
+  ];
+
+  if (user.role === 'admin') {
+    navItems.push({ path: '/admin', label: 'Admin', icon: Shield });
+  }
+
+  return (
+    <nav className="border-b bg-card">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
+              <CreditCard className="h-6 w-6 text-primary" />
+              <span>CardPerks</span>
+            </Link>
+            
+            <div className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.path;
+                return (
+                  <Link key={item.path} href={item.path}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="gap-2"
+                      data-testid={`nav-${item.label.toLowerCase()}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full" data-testid="button-user-menu">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback>
+                      {user.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} data-testid="button-logout">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}

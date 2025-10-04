@@ -1,0 +1,115 @@
+import { useState } from 'react';
+import { Search, MapPin, TrendingUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import type { Merchant, Card as CardType } from '@shared/schema';
+
+interface MerchantSearchProps {
+  onSearch: (query: string) => void;
+  results: (Merchant & { bestCard?: CardType; perkValue?: string })[];
+  isSearching?: boolean;
+}
+
+export function MerchantSearch({ onSearch, results, isSearching }: MerchantSearchProps) {
+  const [query, setQuery] = useState('');
+
+  const handleSearch = (value: string) => {
+    setQuery(value);
+    if (value.length > 2) {
+      onSearch(value);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4">
+          <Search className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <Input
+          type="search"
+          placeholder="Where are you shopping today?"
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="pl-12 h-14 text-lg rounded-xl"
+          data-testid="input-merchant-search"
+        />
+      </div>
+
+      {isSearching && (
+        <div className="text-center py-8 text-muted-foreground">
+          Searching merchants...
+        </div>
+      )}
+
+      {!isSearching && results.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Search Results</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {results.map((merchant) => (
+              <Card key={merchant.id} className="hover-elevate active-elevate-2" data-testid={`merchant-result-${merchant.id}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg" data-testid={`text-merchant-name-${merchant.id}`}>{merchant.name}</CardTitle>
+                    {merchant.bestCard && (
+                      <Badge variant="secondary" className="bg-primary/10 text-primary">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        Best
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Badge variant="outline">{merchant.category}</Badge>
+                    {merchant.address && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <MapPin className="h-3 w-3" />
+                        <span className="truncate">{merchant.address}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {merchant.bestCard && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm font-medium mb-1">Recommended Card:</p>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-best-card-${merchant.id}`}>{merchant.bestCard.name}</p>
+                      {merchant.perkValue && (
+                        <Badge variant="secondary" className="mt-2 bg-personal/10 text-personal">
+                          {merchant.perkValue}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  
+                  {!merchant.bestCard && (
+                    <p className="text-sm text-muted-foreground">
+                      No perks available for this merchant
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isSearching && query.length > 2 && results.length === 0 && (
+        <Card className="p-8">
+          <div className="text-center space-y-2">
+            <Search className="h-12 w-12 mx-auto text-muted-foreground" />
+            <h3 className="font-semibold">No merchants found</h3>
+            <p className="text-sm text-muted-foreground">
+              Try a different search term or suggest a new merchant
+            </p>
+            <Button variant="outline" className="mt-4" data-testid="button-suggest-merchant">
+              Suggest Merchant
+            </Button>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
