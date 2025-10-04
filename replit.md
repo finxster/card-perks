@@ -162,17 +162,18 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ **UI Enhancement**: AddPerkDialog includes merchant selection dropdown with all available merchants
   - ✅ **Household Card Management**: Full CRUD operations for household cards with EditCardDialog and delete confirmation
   - ✅ **Mobile Navigation**: Responsive hamburger menu with slide-out drawer for mobile devices (< 768px)
+  - ✅ **Critical Bug Fix**: Resolved card duplication issue - cards now appear exactly once in dashboard
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
-  - ✅ Comprehensive testing: Auth flow, household security, and mobile navigation validated
+  - ✅ Comprehensive testing: Auth flow, household security, mobile navigation, and card management validated
   - ✅ Navigation includes Dashboard, Household, Suggest (Crowdsource), and Admin links
 
 ## Testing Status
 - ✅ **Authentication Flow**: Registration → Email Verification → Login → Dashboard (PASSED)
 - ✅ **Household Invitation Security**: Wrong email blocked (403), correct email accepted (PASSED)
 - ✅ **Mobile Navigation**: Hamburger menu, drawer behavior, and responsive breakpoints verified (PASSED)
+- ✅ **Card Management**: Card creation shows exactly once, no duplicate key warnings (PASSED)
 - ⚠️ **Email Delivery**: Cloudflare Worker DNS issue (emails not sent, but tokens work via API)
-- 📝 **Future**: Card management and merchant search UI tests (pending test env auth fix)
 
 ## Known Issues
 1. **Email Delivery**: Cloudflare Worker domain not resolving (DNS error) - verification tokens work via direct API calls
