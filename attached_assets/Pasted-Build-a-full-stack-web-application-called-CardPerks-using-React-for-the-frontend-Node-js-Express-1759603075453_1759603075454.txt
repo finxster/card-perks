@@ -1,0 +1,130 @@
+Build a full-stack web application called CardPerks, using React for the frontend, Node.js + Express for the backend, and PostgreSQL for the database. The app helps users discover which credit card gives them the best perks, cashback, or rewards for a specific store or category.
+Each user can register their own credit cards, track personal perks, and explore public merchant perks. The app also supports households (family groups), where multiple users can share cards and perks, and includes crowdsourcing features to let users suggest new merchants or perks for admin approval.
+The system must include authentication, email verification, household management, admin dashboard, and crowdsourced submissions.
+🧩 Roles
+There are three user roles:
+Regular user — registers cards, manages perks, joins or creates households.
+Household owner — a regular user who creates a household and can invite members.
+Admin — manages public data (merchants, perks) and approves crowdsourced suggestions.
+🏠 Households
+Any registered user can create a household.
+The creator becomes the household owner and can invite others by email.
+Cards and perks can be personal or household-shared.
+Household members can view shared cards but cannot delete or reassign ownership.
+Invites are handled via email (Cloudflare Worker).
+💳 Cards and Perks
+Each card belongs to a network (Visa, Mastercard, Amex, etc.) and can include one or more perks.
+Personal perks: visible only to the owner.
+Public perks: visible globally, linked to merchants.
+Users can attach a perk to a card and see where it applies.
+Admins can add or update public perks.
+🧭 Dashboard
+The dashboard displays:
+A card summary section with clear visual distinction between personal and household cards.
+Each card tile should have a small icon or tag (e.g. 👤 for personal, 🏠 for household).
+Alternatively, personal cards may remain unmarked, and household cards are explicitly tagged.
+A search bar asking: “Where are you shopping today?”
+On search, show merchant results with best card recommendation.
+Optional “Suggested Perks” section for personalized recommendations.
+🔐 Authentication and Email Verification
+Authentication is handled via email (no phone login in MVP).
+Use JWT tokens for session management and bcrypt for password hashing.
+All emails (verification, invites, password reset) go through a Cloudflare Worker endpoint.
+The base Worker URL (to be updated later) is:
+https://cardperks.oieusouofinx.cloudflare.com/email
+Backend Endpoints — /auth
+Method	Endpoint	Description
+POST	/auth/register	Register new user and trigger email verification via Worker
+POST	/auth/login	Authenticate user and return JWT
+GET	/auth/verify/:token	Verify user email from token
+POST	/auth/invite	Send household invitation email
+GET	/auth/accept/:inviteToken	Accept invitation and join household
+Passwords must be hashed with bcrypt, and tokens expire in 24h.
+Private user data must never be exposed via public endpoints.
+Worker Endpoints — /email
+Method	Endpoint	Description
+POST	/email/verify	Sends verification email
+POST	/email/invite	Sends household invitation email
+POST	/email/reset	Sends password reset email (future)
+⚙️ Functional Requirements
+User Accounts
+Register with name, email, password.
+Verify email via Cloudflare Worker.
+Login returns JWT; token required for all protected routes.
+Each user has a profile with personal cards and optional household membership.
+Cards
+CRUD operations for cards.
+Each card has: name, network, image/icon, isHousehold flag, ownerId.
+Cards marked isHousehold = true are visible to all household members.
+Perks
+CRUD for personal perks.
+Public perks only editable by admins.
+Fields: name, description, merchantId, expirationDate, isPublic, createdBy.
+Merchants
+Global list accessible to all.
+CRUD restricted to admin.
+Users can suggest new merchants (crowdsourcing).
+Crowdsourcing
+Users submit new merchant or perk suggestions.
+Submissions stored in pending state (status = pending).
+Admin dashboard lists pending suggestions for review.
+🛠 Technical Requirements
+Backend
+Node.js + Express
+Authentication via JWT
+Password hashing with bcrypt
+ORM: Prisma or Sequelize (PostgreSQL)
+Environment variables for secrets and DB URL
+Modular routing: /auth, /cards, /perks, /merchants, /crowdsourcing, /household, /admin
+Frontend
+React + Vite
+React Router for navigation
+Axios for API calls
+Context or Redux Toolkit for auth state
+Responsive design (desktop-first, mobile-adaptive)
+Component examples:
+CardTile (with ownership icon)
+SearchBar
+PerkList
+Dashboard
+AdminPanel
+Database Schema (PostgreSQL)
+Tables (simplified):
+users: id, name, email, passwordHash, verified, createdAt
+households: id, name, ownerId
+household_members: householdId, userId
+cards: id, name, network, ownerId, isHousehold
+perks: id, name, description, merchantId, expiration, isPublic, createdBy
+merchants: id, name, category, address
+crowdsourcing: id, type (‘merchant’ | ‘perk’), payload JSON, status, submittedBy
+🧑‍💼 Admin Dashboard
+Merchant Management: CRUD operations for merchants.
+Crowdsourcing Moderation: Approve/reject merchant and perk suggestions.
+Public Perks Management: Create or edit global perks.
+Logs: Basic table of recent submissions.
+Admins cannot access personal cards, perks, or user info.
+🚀 Onboarding Flow
+User registers with name, email, and password.
+Receives verification email via Worker.
+After verifying:
+Can add personal cards; or
+Create household and invite members.
+Dashboard shows initial cards, perks, and search bar.
+🧱 MVP Deliverables
+✅ Authentication (register, login, verify)
+✅ Email via Cloudflare Worker
+✅ CRUD for cards, perks, merchants
+✅ Dashboard with best-card search
+✅ Household creation and invitations
+✅ Crowdsourcing flow
+✅ Admin panel for moderation
+🔮 Future Enhancements
+Phone login via OTP (Twilio or MessageBird)
+Two-factor authentication
+Push/email notifications for expiring perks
+Location-based suggestions
+Public API endpoints
+Native mobile app
+Goal:
+Generate a complete full-stack scaffold (frontend + backend + database + worker integration) implementing all the above logic.
+Use clean modular architecture, RESTful endpoints, JWT authentication, and a clear folder structure (/frontend, /backend, /worker).
