@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, MapPin, TrendingUp } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ interface MerchantSearchProps {
 
 export function MerchantSearch({ onSearch, results, isSearching }: MerchantSearchProps) {
   const [query, setQuery] = useState('');
+  const [, setLocation] = useLocation();
 
   const handleSearch = (value: string) => {
     setQuery(value);
@@ -104,7 +106,12 @@ export function MerchantSearch({ onSearch, results, isSearching }: MerchantSearc
             <p className="text-sm text-muted-foreground">
               Try a different search term or suggest a new merchant
             </p>
-            <Button variant="outline" className="mt-4" data-testid="button-suggest-merchant">
+            <Button 
+              variant="outline" 
+              className="mt-4" 
+              onClick={() => setLocation('/crowdsource')}
+              data-testid="button-suggest-merchant"
+            >
               Suggest Merchant
             </Button>
           </div>
