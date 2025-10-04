@@ -61,7 +61,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
-      const { name, email, password } = insertUserSchema.parse(req.body);
+      const { name, email, password } = req.body;
+      
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: 'Name, email, and password are required' });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      }
       
       const existing = await storage.getUserByEmail(email);
       if (existing) {
