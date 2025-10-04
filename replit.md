@@ -34,9 +34,12 @@ CardPerks is a full-stack web application that helps users discover which credit
 
 4. **Perks Tracking**
    - Personal perks for individual cards (must be associated with a merchant)
+   - Full CRUD operations: Create, Edit, Delete perks
+   - Dedicated Perks page at /perks with comprehensive management
+   - Edit/delete actions available on Dashboard and Perks page
    - Public perks managed by admins
    - All perks require merchant associations
-   - Expiration tracking
+   - Expiration tracking with visual status indicators
 
 5. **Merchant Search**
    - Search merchants by name or category
@@ -88,6 +91,8 @@ CardPerks is a full-stack web application that helps users discover which credit
 ### Perks
 - `GET /api/perks` - Get user's perks
 - `POST /api/perks` - Create new perk (requires merchantId)
+- `PATCH /api/perks/:id` - Update perk (user must own the perk)
+- `DELETE /api/perks/:id` - Delete perk (user must own the perk)
 
 ### Merchants
 - `GET /api/merchants` - Get all merchants
@@ -150,6 +155,16 @@ Email endpoints:
 Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
 
 ## Recent Changes
+- **2025-10-04**: Perks CRUD Enhancement
+  - ✅ **Full Perks CRUD**: Users can now edit and delete their perks
+  - ✅ **Dedicated Perks Page**: New /perks route with comprehensive perk management interface
+  - ✅ **EditPerkDialog Component**: Pre-filled dialog for editing existing perks with merchant selection
+  - ✅ **Dashboard Integration**: Edit (Pencil icon) and Delete (Trash icon) buttons on perk cards
+  - ✅ **API Endpoints**: Added PATCH /api/perks/:id and DELETE /api/perks/:id with ownership validation
+  - ✅ **Security**: Ownership checks enforce that users can only modify their own perks (createdBy validation)
+  - ✅ **Navigation Update**: Added "Perks" link to navigation menu with Star icon
+  - ✅ **UX Enhancements**: Confirmation dialogs for destructive actions, success/error toasts, cache invalidation
+
 - **2025-10-04**: Complete MVP implementation with frontend, backend, and database
   - ✅ Full authentication flow with email verification (JWT + bcrypt)
   - ✅ Card management with personal/household distinction
@@ -167,7 +182,7 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
   - ✅ Comprehensive testing: Auth flow, household security, mobile navigation, and card management validated
-  - ✅ Navigation includes Dashboard, Household, Suggest (Crowdsource), and Admin links
+  - ✅ Navigation includes Dashboard, Perks, Household, Suggest (Crowdsource), and Admin links
 
 ## Testing Status
 - ✅ **Authentication Flow**: Registration → Email Verification → Login → Dashboard (PASSED)
@@ -187,3 +202,4 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
 - Duplicate household membership prevented
 - JWT tokens properly propagated in all API requests
 - Admin-only routes protected with role check
+- Perk ownership validation: Users can only edit/delete perks they created (createdBy check on PATCH/DELETE endpoints)
