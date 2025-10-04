@@ -10,12 +10,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut } from 'lucide-react';
+import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut, Menu } from 'lucide-react';
+import { useState } from 'react';
 
 export function AppNav() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (!user) return null;
 
@@ -62,6 +71,50 @@ export function AppNav() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  data-testid="button-mobile-menu"
+                  aria-label="Open navigation menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[280px]">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Navigation
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 flex flex-col gap-2">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location === item.path;
+                    return (
+                      <Link
+                        key={item.path}
+                        href={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Button
+                          variant={isActive ? 'secondary' : 'ghost'}
+                          className="w-full justify-start gap-3"
+                          data-testid={`mobile-nav-${item.label.toLowerCase()}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </SheetContent>
+            </Sheet>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
