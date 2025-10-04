@@ -149,9 +149,11 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ **Security Fix**: Resolved IDOR vulnerability in household invites (email validation enforced)
   - ✅ Merchant search with best card recommendations
   - ✅ Crowdsourcing system with admin moderation workflow
+  - ✅ **Feature Added**: Personal perk management - users can now add perks directly to their cards via AddPerkDialog on dashboard
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
   - ✅ Comprehensive testing: Auth flow and household security validated
+  - ✅ Navigation includes Dashboard, Household, Suggest (Crowdsource), and Admin links
 
 ## Testing Status
 - ✅ **Authentication Flow**: Registration → Email Verification → Login → Dashboard (PASSED)
