@@ -56,7 +56,7 @@ export const perks = pgTable("perks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description").notNull(),
-  merchantId: varchar("merchant_id").references(() => merchants.id, { onDelete: "cascade" }),
+  merchantId: varchar("merchant_id").notNull().references(() => merchants.id, { onDelete: "cascade" }),
   expirationDate: timestamp("expiration_date"),
   isPublic: boolean("is_public").notNull().default(false),
   createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
