@@ -81,9 +81,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         email,
         passwordHash,
-        verified: false,
         role: 'user',
-      });
+      } as any);
 
       const token = randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -185,6 +184,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cardData = insertCardSchema.parse(req.body);
       const card = await storage.createCard({ ...cardData, ownerId: req.userId! });
       res.json(card);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch('/api/cards/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const card = await storage.getCard(req.params.id);
+      if (!card || card.ownerId !== req.userId) {
+        return res.status(404).json({ message: 'Card not found' });
+      }
+      const cardData = insertCardSchema.parse(req.body);
+      const updated = await storage.updateCard(req.params.id, cardData);
+      res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -361,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Critical security check: ensure authenticated user's email matches invite email
-      if (req.user.email.toLowerCase() !== inviteToken.email.toLowerCase()) {
+      if (!inviteToken.email || req.user.email.toLowerCase() !== inviteToken.email.toLowerCase()) {
         return res.status(403).json({ message: 'This invitation was sent to a different email address' });
       }
 

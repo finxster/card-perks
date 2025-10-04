@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { insertHouseholdSchema } from '@shared/schema';
+import { insertHouseholdSchema, insertCardSchema, type InsertCard, type Card as CardType, type User, type Household as HouseholdType } from '@shared/schema';
 import { z } from 'zod';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -24,10 +24,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Home, Plus, Users, Mail } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Home, Plus, Users, Mail, CreditCard } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CardTile } from '@/components/cards/card-tile';
+import { AddCardDialog } from '@/components/cards/add-card-dialog';
+import { EditCardDialog } from '@/components/cards/edit-card-dialog';
 
 const inviteSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -39,15 +52,24 @@ export default function Household() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<CardType | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
-  const { data: household, isLoading } = useQuery({
+  const { data: household, isLoading } = useQuery<HouseholdType | null>({
     queryKey: ['/api/household/my'],
   });
 
-  const { data: members = [] } = useQuery({
+  const { data: members = [] } = useQuery<(User & { isOwner?: boolean })[]>({
     queryKey: ['/api/household/members'],
     enabled: !!household,
   });
+
+  const { data: cards = [] } = useQuery<CardType[]>({
+    queryKey: ['/api/cards'],
+    enabled: !!household,
+  });
+
+  const householdCards = cards.filter(card => card.isHousehold);
 
   const createForm = useForm<z.infer<typeof insertHouseholdSchema>>({
     resolver: zodResolver(insertHouseholdSchema),
@@ -83,6 +105,44 @@ export default function Household() {
       });
       setInviteDialogOpen(false);
       inviteForm.reset();
+    },
+  });
+
+  const addCardMutation = useMutation({
+    mutationFn: (data: InsertCard) =>
+      apiRequest('POST', '/api/cards', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cards'] });
+      toast({
+        title: 'Card added',
+        description: 'Your household card has been added successfully.',
+      });
+    },
+  });
+
+  const updateCardMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: InsertCard }) =>
+      apiRequest('PATCH', `/api/cards/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cards'] });
+      toast({
+        title: 'Card updated',
+        description: 'Your card has been updated successfully.',
+      });
+      setEditingCard(null);
+    },
+  });
+
+  const deleteCardMutation = useMutation({
+    mutationFn: (cardId: string) =>
+      apiRequest('DELETE', `/api/cards/${cardId}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cards'] });
+      toast({
+        title: 'Card deleted',
+        description: 'Your card has been removed.',
+      });
+      setDeletingCardId(null);
     },
   });
 
@@ -253,6 +313,48 @@ export default function Household() {
         </div>
 
         <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Household Cards
+              </CardTitle>
+              <CardDescription className="mt-1">
+                {householdCards.length} {householdCards.length === 1 ? 'card' : 'cards'} shared with household
+              </CardDescription>
+            </div>
+            <AddCardDialog
+              onAdd={(data) => addCardMutation.mutateAsync({ ...data, isHousehold: true })}
+              trigger={
+                <Button size="sm" data-testid="button-add-household-card">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Card
+                </Button>
+              }
+            />
+          </CardHeader>
+          <CardContent>
+            {householdCards.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No household cards yet. Add a card to get started!
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {householdCards.map((card) => (
+                  <CardTile
+                    key={card.id}
+                    card={card}
+                    onEdit={() => setEditingCard(card)}
+                    onDelete={() => setDeletingCardId(card.id)}
+                    canManage={true}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -269,7 +371,7 @@ export default function Household() {
               </div>
             ) : (
               <div className="space-y-3">
-                {members.map((member: any) => (
+                {members.map((member) => (
                   <div
                     key={member.id}
                     className="flex items-center justify-between p-3 rounded-lg hover-elevate"
@@ -301,6 +403,34 @@ export default function Household() {
             )}
           </CardContent>
         </Card>
+
+        <EditCardDialog
+          card={editingCard}
+          open={!!editingCard}
+          onOpenChange={(open) => !open && setEditingCard(null)}
+          onUpdate={(id, data) => updateCardMutation.mutateAsync({ id, data })}
+        />
+
+        <AlertDialog open={!!deletingCardId} onOpenChange={(open) => !open && setDeletingCardId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Card</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this card? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingCardId && deleteCardMutation.mutate(deletingCardId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
