@@ -33,9 +33,9 @@ CardPerks is a full-stack web application that helps users discover which credit
    - Owner-based permissions
 
 4. **Perks Tracking**
-   - Personal perks for individual cards
+   - Personal perks for individual cards (must be associated with a merchant)
    - Public perks managed by admins
-   - Merchant associations
+   - All perks require merchant associations
    - Expiration tracking
 
 5. **Merchant Search**
@@ -81,10 +81,12 @@ CardPerks is a full-stack web application that helps users discover which credit
 
 ### Perks
 - `GET /api/perks` - Get user's perks
-- `POST /api/perks` - Create new perk
+- `POST /api/perks` - Create new perk (requires merchantId)
 
 ### Merchants
+- `GET /api/merchants` - Get all merchants
 - `GET /api/merchants/search?q=query` - Search merchants
+
 
 ### Household
 - `GET /api/household/my` - Get user's household
@@ -150,6 +152,8 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ Merchant search with best card recommendations
   - ✅ Crowdsourcing system with admin moderation workflow
   - ✅ **Feature Added**: Personal perk management - users can now add perks directly to their cards via AddPerkDialog on dashboard
+  - ✅ **Schema Update**: Perks now require merchant association (merchantId is NOT NULL)
+  - ✅ **UI Enhancement**: AddPerkDialog includes merchant selection dropdown with all available merchants
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
   - ✅ Comprehensive testing: Auth flow and household security validated
