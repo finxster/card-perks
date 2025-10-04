@@ -5,8 +5,19 @@ import { Card as CardType, Merchant, Perk } from '@shared/schema';
 import { CardTile } from '@/components/cards/card-tile';
 import { AddCardDialog } from '@/components/cards/add-card-dialog';
 import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
+import { EditPerkDialog } from '@/components/perks/edit-perk-dialog';
 import { MerchantSearch } from '@/components/merchant-search';
 import { PerkList } from '@/components/perks/perk-list';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -18,6 +29,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [editingPerk, setEditingPerk] = useState<Perk | null>(null);
+  const [deletingPerkId, setDeletingPerkId] = useState<string | null>(null);
 
   const { data: cards = [], isLoading: cardsLoading } = useQuery<(CardType & { perkCount: number })[]>({
     queryKey: ['/api/cards'],
@@ -74,6 +87,48 @@ export default function Dashboard() {
       toast({
         title: 'Failed to add perk',
         description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const editPerkMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Perk> }) => {
+      return await apiRequest(`/api/perks/${id}`, 'PATCH', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      setEditingPerk(null);
+      toast({
+        title: 'Success',
+        description: 'Perk updated successfully',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update perk',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deletePerkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/perks/${id}`, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      setDeletingPerkId(null);
+      toast({
+        title: 'Success',
+        description: 'Perk deleted successfully',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete perk',
         variant: 'destructive',
       });
     },
@@ -229,10 +284,45 @@ export default function Dashboard() {
           {perksLoading ? (
             <Card className="h-32 animate-pulse bg-muted" />
           ) : (
-            <PerkList perks={perks} showAddButton={false} />
+            <PerkList 
+              perks={perks} 
+              showAddButton={false}
+              onEdit={setEditingPerk}
+              onDelete={setDeletingPerkId}
+            />
           )}
         </div>
       </div>
+
+      {editingPerk && (
+        <EditPerkDialog
+          perk={editingPerk}
+          cards={cards}
+          open={!!editingPerk}
+          onOpenChange={(open) => !open && setEditingPerk(null)}
+          onEdit={(id, data) => editPerkMutation.mutateAsync({ id, data })}
+        />
+      )}
+
+      <AlertDialog open={!!deletingPerkId} onOpenChange={(open) => !open && setDeletingPerkId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Perk?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this perk.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-perk">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingPerkId && deletePerkMutation.mutate(deletingPerkId)}
+              data-testid="button-confirm-delete-perk"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

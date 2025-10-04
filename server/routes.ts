@@ -236,6 +236,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/perks/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const perk = await storage.getPerk(req.params.id);
+      if (!perk || perk.createdBy !== req.userId) {
+        return res.status(404).json({ message: 'Perk not found' });
+      }
+      const perkData = insertPerkSchema.partial().parse(req.body);
+      const updated = await storage.updatePerk(req.params.id, perkData);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete('/api/perks/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const perk = await storage.getPerk(req.params.id);
+      if (!perk || perk.createdBy !== req.userId) {
+        return res.status(404).json({ message: 'Perk not found' });
+      }
+      await storage.deletePerk(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Merchants Routes
   app.get('/api/merchants', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {

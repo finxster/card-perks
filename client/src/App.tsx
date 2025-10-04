@@ -13,6 +13,7 @@ import Register from "@/pages/register";
 import VerifyEmail from "@/pages/verify-email";
 import Dashboard from "@/pages/dashboard";
 import Household from "@/pages/household";
+import Perks from "@/pages/perks";
 import Crowdsource from "@/pages/crowdsource";
 import Admin from "@/pages/admin";
 import { useEffect } from "react";
@@ -41,6 +42,12 @@ function Router() {
       <Route path="/household">
         <ProtectedRoute>
           <Household />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/perks">
+        <ProtectedRoute>
+          <Perks />
         </ProtectedRoute>
       </Route>
       

@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, TrendingUp, Plus } from 'lucide-react';
+import { Calendar, TrendingUp, Plus, Edit2, Trash2 } from 'lucide-react';
 import type { Perk, Merchant } from '@shared/schema';
 import { format, isPast, differenceInDays } from 'date-fns';
 
@@ -13,9 +13,11 @@ interface PerkListProps {
   perks: PerkWithMerchant[];
   onAdd?: () => void;
   showAddButton?: boolean;
+  onEdit?: (perk: Perk) => void;
+  onDelete?: (perkId: string) => void;
 }
 
-export function PerkList({ perks, onAdd, showAddButton = true }: PerkListProps) {
+export function PerkList({ perks, onAdd, showAddButton = true, onEdit, onDelete }: PerkListProps) {
   const getPerkStatus = (perk: Perk) => {
     if (!perk.expirationDate) return null;
     const expDate = new Date(perk.expirationDate);
@@ -75,24 +77,55 @@ export function PerkList({ perks, onAdd, showAddButton = true }: PerkListProps) 
                 <CardContent className="space-y-2">
                   <p className="text-sm text-muted-foreground">{perk.description}</p>
                   
-                  {perk.expirationDate && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        Expires {format(new Date(perk.expirationDate), 'MMM d, yyyy')}
-                      </span>
-                      {status === 'expiring' && (
-                        <Badge variant="outline" className="border-orange-500 text-orange-600">
-                          Expiring Soon
-                        </Badge>
-                      )}
-                      {status === 'expired' && (
-                        <Badge variant="outline" className="border-destructive text-destructive">
-                          Expired
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between pt-2">
+                    {perk.expirationDate ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Expires {format(new Date(perk.expirationDate), 'MMM d, yyyy')}
+                        </span>
+                        {status === 'expiring' && (
+                          <Badge variant="outline" className="border-orange-500 text-orange-600">
+                            Expiring Soon
+                          </Badge>
+                        )}
+                        {status === 'expired' && (
+                          <Badge variant="outline" className="border-destructive text-destructive">
+                            Expired
+                          </Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                    
+                    {(onEdit || onDelete) && (
+                      <div className="flex gap-1">
+                        {onEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onEdit(perk)}
+                            data-testid={`button-edit-perk-${perk.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onDelete(perk.id)}
+                            data-testid={`button-delete-perk-${perk.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );

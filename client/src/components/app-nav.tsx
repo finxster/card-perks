@@ -30,8 +30,9 @@ export function AppNav() {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/perks', label: 'Perks', icon: TrendingUp },
     { path: '/household', label: 'Household', icon: Home },
-    { path: '/crowdsource', label: 'Suggest', icon: TrendingUp },
+    { path: '/crowdsource', label: 'Suggest', icon: CreditCard },
   ];
 
   if (user.role === 'admin') {
