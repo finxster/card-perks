@@ -339,10 +339,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (new Date() > new Date(inviteToken.expiresAt)) {
+        await storage.deleteVerificationToken(token);
         return res.status(400).json({ message: 'Invite link expired' });
       }
 
+      // Critical security check: ensure authenticated user's email matches invite email
+      if (req.user.email.toLowerCase() !== inviteToken.email.toLowerCase()) {
+        return res.status(403).json({ message: 'This invitation was sent to a different email address' });
+      }
+
       const metadata = inviteToken.metadata as any;
+      
+      // Check if user is already in this household
+      const existingHousehold = await storage.getUserHousehold(req.userId!);
+      if (existingHousehold) {
+        if (existingHousehold.id === metadata.householdId) {
+          await storage.deleteVerificationToken(token);
+          return res.json({ success: true, householdId: metadata.householdId, message: 'Already a member' });
+        }
+        return res.status(400).json({ message: 'You are already in another household. Leave it first to join a new one.' });
+      }
+
       await storage.addHouseholdMember(metadata.householdId, req.userId!);
       await storage.deleteVerificationToken(token);
 
