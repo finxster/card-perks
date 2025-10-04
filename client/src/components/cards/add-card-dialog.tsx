@@ -33,6 +33,7 @@ import { Plus } from 'lucide-react';
 interface AddCardDialogProps {
   onAdd: (card: InsertCard) => Promise<any>;
   trigger?: React.ReactNode;
+  isHousehold?: boolean;
 }
 
 const networks = [
@@ -45,7 +46,7 @@ const networks = [
   'Other',
 ];
 
-export function AddCardDialog({ onAdd, trigger }: AddCardDialogProps) {
+export function AddCardDialog({ onAdd, trigger, isHousehold }: AddCardDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -55,7 +56,7 @@ export function AddCardDialog({ onAdd, trigger }: AddCardDialogProps) {
       name: '',
       network: '',
       lastFourDigits: '',
-      isHousehold: false,
+      isHousehold: isHousehold ?? false,
     },
   });
 
@@ -84,9 +85,15 @@ export function AddCardDialog({ onAdd, trigger }: AddCardDialogProps) {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Credit Card</DialogTitle>
+          <DialogTitle>
+            {isHousehold === true ? 'Add Household Card' : isHousehold === false ? 'Add Personal Card' : 'Add Credit Card'}
+          </DialogTitle>
           <DialogDescription>
-            Add a new credit card to track your perks and rewards.
+            {isHousehold === true 
+              ? 'Add a card that will be shared with all household members.'
+              : isHousehold === false
+              ? 'Add a personal card to track your perks and rewards.'
+              : 'Add a new credit card to track your perks and rewards.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -151,27 +158,29 @@ export function AddCardDialog({ onAdd, trigger }: AddCardDialogProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="isHousehold"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Household Card</FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      Share this card with your household members
-                    </p>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="switch-household"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {isHousehold === undefined && (
+              <FormField
+                control={form.control}
+                name="isHousehold"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Household Card</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Share this card with your household members
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-household"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-2 justify-end">
               <Button

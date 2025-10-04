@@ -324,7 +324,8 @@ export default function Household() {
               </CardDescription>
             </div>
             <AddCardDialog
-              onAdd={(data) => addCardMutation.mutateAsync({ ...data, isHousehold: true })}
+              onAdd={(data) => addCardMutation.mutateAsync(data)}
+              isHousehold={true}
               trigger={
                 <Button size="sm" data-testid="button-add-household-card">
                   <Plus className="h-4 w-4 mr-2" />

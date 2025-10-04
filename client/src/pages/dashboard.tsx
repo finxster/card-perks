@@ -146,7 +146,7 @@ export default function Dashboard() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Your Cards</h2>
-            <AddCardDialog onAdd={(data) => addCardMutation.mutateAsync(data)} />
+            <AddCardDialog onAdd={(data) => addCardMutation.mutateAsync(data)} isHousehold={false} />
           </div>
 
           {cardsLoading ? (
@@ -169,6 +169,7 @@ export default function Dashboard() {
                 </div>
                 <AddCardDialog
                   onAdd={(data) => addCardMutation.mutateAsync(data)}
+                  isHousehold={false}
                   trigger={
                     <Button size="lg" data-testid="button-add-first-card">
                       <Plus className="h-4 w-4 mr-2" />
