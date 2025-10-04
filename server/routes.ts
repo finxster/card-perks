@@ -7,7 +7,7 @@ import { randomBytes } from "crypto";
 import { insertUserSchema, insertCardSchema, insertPerkSchema, insertMerchantSchema, insertHouseholdSchema, insertCrowdsourcingSchema } from "@shared/schema";
 
 const JWT_SECRET = process.env.JWT_SECRET || "cardperks-secret-key-change-in-production";
-const CLOUDFLARE_EMAIL_WORKER = "https://cardperks.oieusouofinx.cloudflare.com/email";
+const CLOUDFLARE_EMAIL_WORKER = "https://cardperks-email-proxy-dev.oieusouofinx.workers.dev";
 
 interface AuthRequest extends Request {
   userId?: string;
