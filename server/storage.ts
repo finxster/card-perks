@@ -148,15 +148,28 @@ export class DatabaseStorage implements IStorage {
     const household = await this.getUserHousehold(userId);
     if (!household) return userCards;
     
+    const members = await db
+      .select({ userId: householdMembers.userId })
+      .from(householdMembers)
+      .where(eq(householdMembers.householdId, household.id));
+    
+    const otherMemberIds = members
+      .map(m => m.userId)
+      .filter(id => id !== userId);
+    
+    if (otherMemberIds.length === 0) return userCards;
+    
     const householdCards = await db
       .select()
       .from(cards)
-      .where(and(eq(cards.isHousehold, true)))
-      .leftJoin(householdMembers, eq(cards.ownerId, householdMembers.userId))
-      .where(eq(householdMembers.householdId, household.id));
+      .where(
+        and(
+          eq(cards.isHousehold, true),
+          or(...otherMemberIds.map(id => eq(cards.ownerId, id)))
+        )
+      );
     
-    const allHouseholdCards = householdCards.map(hc => hc.cards);
-    return [...userCards, ...allHouseholdCards];
+    return [...userCards, ...householdCards];
   }
 
   async getHouseholdCards(householdId: string): Promise<Card[]> {
