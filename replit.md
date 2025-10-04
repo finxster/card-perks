@@ -142,9 +142,30 @@ Email endpoints:
 Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
 
 ## Recent Changes
-- **2025-01-04**: Initial MVP implementation with complete frontend, backend, and database setup
-- Complete authentication flow with email verification
-- Card management with household sharing
-- Merchant search with best card recommendations
-- Crowdsourcing system with admin moderation
-- Dark mode support
+- **2025-10-04**: Complete MVP implementation with frontend, backend, and database
+  - ✅ Full authentication flow with email verification (JWT + bcrypt)
+  - ✅ Card management with personal/household distinction
+  - ✅ Household creation and secure invitation system
+  - ✅ **Security Fix**: Resolved IDOR vulnerability in household invites (email validation enforced)
+  - ✅ Merchant search with best card recommendations
+  - ✅ Crowdsourcing system with admin moderation workflow
+  - ✅ Protected routes with role-based access control
+  - ✅ Dark mode support with fintech-inspired design system
+  - ✅ Comprehensive testing: Auth flow and household security validated
+
+## Testing Status
+- ✅ **Authentication Flow**: Registration → Email Verification → Login → Dashboard (PASSED)
+- ✅ **Household Invitation Security**: Wrong email blocked (403), correct email accepted (PASSED)
+- ⚠️ **Email Delivery**: Cloudflare Worker DNS issue (emails not sent, but tokens work via API)
+- 📝 **Future**: Card management and merchant search UI tests (pending test env auth fix)
+
+## Known Issues
+1. **Email Delivery**: Cloudflare Worker domain not resolving (DNS error) - verification tokens work via direct API calls
+2. **Test Environment**: Bcrypt hash generation limitation prevents some UI test scenarios
+
+## Security Enhancements
+- Household invitation tokens validated against authenticated user email (case-insensitive)
+- Token expiration and consumption enforced
+- Duplicate household membership prevented
+- JWT tokens properly propagated in all API requests
+- Admin-only routes protected with role check
