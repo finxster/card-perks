@@ -224,6 +224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Merchants Routes
+  app.get('/api/merchants', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const merchants = await storage.getAllMerchants();
+      res.json(merchants);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get('/api/merchants/search', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const query = req.query.q as string;
