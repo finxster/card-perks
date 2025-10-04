@@ -54,6 +54,12 @@ CardPerks is a full-stack web application that helps users discover which credit
    - Approve/reject suggestions
    - Create public perks
 
+8. **Mobile Navigation**
+   - Responsive hamburger menu for mobile devices (< 768px)
+   - Slide-out drawer navigation from right side
+   - Auto-closes on navigation
+   - Accessible with aria-labels
+
 ## Database Schema
 
 ### Tables
@@ -154,14 +160,17 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ **Feature Added**: Personal perk management - users can now add perks directly to their cards via AddPerkDialog on dashboard
   - ✅ **Schema Update**: Perks now require merchant association (merchantId is NOT NULL)
   - ✅ **UI Enhancement**: AddPerkDialog includes merchant selection dropdown with all available merchants
+  - ✅ **Household Card Management**: Full CRUD operations for household cards with EditCardDialog and delete confirmation
+  - ✅ **Mobile Navigation**: Responsive hamburger menu with slide-out drawer for mobile devices (< 768px)
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
-  - ✅ Comprehensive testing: Auth flow and household security validated
+  - ✅ Comprehensive testing: Auth flow, household security, and mobile navigation validated
   - ✅ Navigation includes Dashboard, Household, Suggest (Crowdsource), and Admin links
 
 ## Testing Status
 - ✅ **Authentication Flow**: Registration → Email Verification → Login → Dashboard (PASSED)
 - ✅ **Household Invitation Security**: Wrong email blocked (403), correct email accepted (PASSED)
+- ✅ **Mobile Navigation**: Hamburger menu, drawer behavior, and responsive breakpoints verified (PASSED)
 - ⚠️ **Email Delivery**: Cloudflare Worker DNS issue (emails not sent, but tokens work via API)
 - 📝 **Future**: Card management and merchant search UI tests (pending test env auth fix)
 
