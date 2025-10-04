@@ -159,6 +159,9 @@ export const crowdsourcingRelations = relations(crowdsourcing, ({ one }) => ({
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  passwordHash: true,
+  verified: true,
+  role: true,
   createdAt: true,
 }).extend({
   password: z.string().min(8, "Password must be at least 8 characters"),
