@@ -163,6 +163,7 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
   - ✅ **Household Card Management**: Full CRUD operations for household cards with EditCardDialog and delete confirmation
   - ✅ **Mobile Navigation**: Responsive hamburger menu with slide-out drawer for mobile devices (< 768px)
   - ✅ **Critical Bug Fix**: Resolved card duplication issue - cards now appear exactly once in dashboard
+  - ✅ **UX Enhancement**: Context-aware card creation - Dashboard creates only personal cards, Household page creates only household cards (no confusing toggle)
   - ✅ Protected routes with role-based access control
   - ✅ Dark mode support with fintech-inspired design system
   - ✅ Comprehensive testing: Auth flow, household security, mobile navigation, and card management validated
@@ -173,6 +174,7 @@ Base URL: `https://cardperks.oieusouofinx.cloudflare.com/email`
 - ✅ **Household Invitation Security**: Wrong email blocked (403), correct email accepted (PASSED)
 - ✅ **Mobile Navigation**: Hamburger menu, drawer behavior, and responsive breakpoints verified (PASSED)
 - ✅ **Card Management**: Card creation shows exactly once, no duplicate key warnings (PASSED)
+- ✅ **Context-Aware Card Creation**: Dashboard creates personal cards only, Household page creates household cards only, no toggle shown (PASSED)
 - ⚠️ **Email Delivery**: Cloudflare Worker DNS issue (emails not sent, but tokens work via API)
 
 ## Known Issues
