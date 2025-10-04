@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { Card as CardType, Merchant, Perk } from '@shared/schema';
 import { CardTile } from '@/components/cards/card-tile';
 import { AddCardDialog } from '@/components/cards/add-card-dialog';
+import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
 import { MerchantSearch } from '@/components/merchant-search';
 import { PerkList } from '@/components/perks/perk-list';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -55,6 +56,25 @@ export default function Dashboard() {
       toast({
         title: 'Card deleted',
         description: 'Your card has been removed.',
+      });
+    },
+  });
+
+  const addPerkMutation = useMutation({
+    mutationFn: (perkData: any) => apiRequest('POST', '/api/perks', perkData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cards'] });
+      toast({
+        title: 'Perk added successfully',
+        description: 'Your new perk has been added to your card.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to add perk',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
@@ -194,9 +214,23 @@ export default function Dashboard() {
           )}
         </div>
 
-        {perks.length > 0 && (
-          <PerkList perks={perks} showAddButton={false} />
-        )}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Your Perks</h2>
+            {cards.length > 0 && (
+              <AddPerkDialog
+                cards={cards}
+                onAdd={(data) => addPerkMutation.mutateAsync(data)}
+              />
+            )}
+          </div>
+          
+          {perksLoading ? (
+            <Card className="h-32 animate-pulse bg-muted" />
+          ) : (
+            <PerkList perks={perks} showAddButton={false} />
+          )}
+        </div>
       </div>
     </div>
   );

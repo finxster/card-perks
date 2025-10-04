@@ -31,7 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus } from 'lucide-react';
 
 interface AddCardDialogProps {
-  onAdd: (card: InsertCard) => Promise<void>;
+  onAdd: (card: InsertCard) => Promise<any>;
   trigger?: React.ReactNode;
 }
 
@@ -142,6 +142,7 @@ export function AddCardDialog({ onAdd, trigger }: AddCardDialogProps) {
                       placeholder="1234"
                       maxLength={4}
                       {...field}
+                      value={field.value || ''}
                       data-testid="input-last-four"
                     />
                   </FormControl>
