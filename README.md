@@ -111,6 +111,29 @@ VITE_API_URL=http://localhost:3001
 
 - Make sure PostgreSQL is running and accessible using the credentials in your `.env`.
 
+## Quick Start
+
+From the project root:
+
+### Backend (API server)
+
+1. Install all dependencies:
+    ```bash
+    npm install
+    ```
+2. Start the backend server:
+    ```bash
+    npm run dev
+    ```
+
+### Frontend (Vite client)
+
+1. In a new terminal, from the project root, run:
+    ```bash
+    npx vite
+    ```
+2. Open [http://127.0.0.1:5173](http://127.0.0.1:5173) in your browser.
+
 ## API Endpoints
 
 - `POST /api/auth/register` – Register user
