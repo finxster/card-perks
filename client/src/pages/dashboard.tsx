@@ -277,15 +277,44 @@ export default function Dashboard() {
               <AddPerkDialog
                 cards={cards}
                 onAdd={(data) => addPerkMutation.mutateAsync(data)}
+                trigger={
+                  <Button size="lg" data-testid="button-add-perk">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Add Perk
+                  </Button>
+                }
               />
             )}
           </div>
-          
           {perksLoading ? (
             <Card className="h-32 animate-pulse bg-muted" />
+          ) : perks.length === 0 ? (
+            <Card className="p-12">
+              <div className="text-center space-y-4">
+                <div className="mx-auto bg-primary/10 p-4 rounded-xl w-fit">
+                  <TrendingUp className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">No perks yet</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Add your first perk to start tracking rewards
+                  </p>
+                </div>
+                <AddPerkDialog
+                  cards={cards}
+                  onAdd={(data) => addPerkMutation.mutateAsync(data)}
+                  trigger={
+                    <Button size="lg" data-testid="button-add-first-perk">
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      Add Your First Perk
+                    </Button>
+                  }
+                />
+              </div>
+            </Card>
           ) : (
-            <PerkList 
-              perks={perks} 
+            <PerkList
+              perks={perks}
               showAddButton={false}
               onEdit={setEditingPerk}
               onDelete={setDeletingPerkId}

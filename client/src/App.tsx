@@ -17,18 +17,26 @@ import Perks from "@/pages/perks";
 import Crowdsource from "@/pages/crowdsource";
 import Admin from "@/pages/admin";
 import { useEffect } from "react";
+import { useAuth } from '@/lib/auth';
+
+function HomeRedirect() {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (isLoading) return;
+    if (user) {
+      setLocation('/dashboard');
+    } else {
+      setLocation('/login');
+    }
+  }, [user, isLoading, setLocation]);
+  return null;
+}
 
 function Router() {
-  const [location, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (location === '/') {
-      setLocation('/dashboard');
-    }
-  }, [location, setLocation]);
-
   return (
     <Switch>
+      <Route path="/" component={HomeRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />

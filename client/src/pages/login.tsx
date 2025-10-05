@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
+import { useEffect } from 'react';
 import {
   Form,
   FormControl,
@@ -27,9 +28,9 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -39,8 +40,14 @@ export default function Login() {
     },
   });
 
+  useEffect(() => {
+    if (!isLoading && user) {
+      setLocation('/dashboard');
+    }
+  }, [user, isLoading, setLocation]);
+
   const onSubmit = async (data: LoginForm) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       await login(data.email, data.password);
       toast({
@@ -55,7 +62,7 @@ export default function Login() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -115,10 +122,10 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isSubmitting}
                 data-testid="button-login"
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
           </Form>
