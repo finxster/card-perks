@@ -5,6 +5,14 @@ import { Card as CardType, Perk, Merchant } from '@shared/schema';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +27,7 @@ import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
 import { EditPerkDialog } from '@/components/perks/edit-perk-dialog';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { TrendingUp, Edit2, Trash2, Calendar, Store } from 'lucide-react';
+import { TrendingUp, Edit2, Trash2, Calendar, Store, Search, Filter, X } from 'lucide-react';
 import { format, isPast, differenceInDays } from 'date-fns';
 
 interface PerkWithMerchant extends Perk {
@@ -31,6 +39,10 @@ export default function PerksPage() {
   const { toast } = useToast();
   const [editingPerk, setEditingPerk] = useState<Perk | null>(null);
   const [deletingPerkId, setDeletingPerkId] = useState<string | null>(null);
+  
+  // Search and filtering state
+  const [perkSearchQuery, setPerkSearchQuery] = useState('');
+  const [selectedCard, setSelectedCard] = useState<string>('all');
 
   const { data: cards = [], isLoading: cardsLoading } = useQuery<CardType[]>({
     queryKey: ['/api/cards'],
@@ -48,6 +60,37 @@ export default function PerksPage() {
     ...perk,
     merchant: merchants.find(m => m.id === perk.merchantId)
   }));
+
+  // Filter only personal perks (exclude household perks)
+  const personalCards = cards.filter((card) => !card.isHousehold);
+  const personalCardIds = personalCards.map(card => card.id);
+  const personalPerks = perksWithMerchants.filter(perk => perk.cardId && personalCardIds.includes(perk.cardId));
+
+  // Search and filter logic
+  const filterPerks = (perks: typeof personalPerks) => {
+    let filtered = perks;
+
+    // Apply search filter
+    if (perkSearchQuery.trim()) {
+      const query = perkSearchQuery.toLowerCase();
+      filtered = filtered.filter(perk => 
+        perk.name?.toLowerCase().includes(query) ||
+        perk.description?.toLowerCase().includes(query) ||
+        cards.find(c => c.id === perk.cardId)?.name?.toLowerCase().includes(query) ||
+        perk.merchant?.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply card filter
+    if (selectedCard !== 'all') {
+      filtered = filtered.filter(perk => perk.cardId === selectedCard);
+    }
+
+    return filtered;
+  };
+
+  const filteredPerks = filterPerks(personalPerks);
+  const hasActiveFilters = perkSearchQuery.trim() !== '' || selectedCard !== 'all';
 
   const addPerkMutation = useMutation({
     mutationFn: async (perk: any) => {
@@ -140,10 +183,71 @@ export default function PerksPage() {
           </p>
         </div>
         <AddPerkDialog 
-          cards={cards} 
+          cards={personalCards} 
           onAdd={(data) => addPerkMutation.mutateAsync(data)}
         />
       </div>
+
+      {/* Search and Filter Controls */}
+      {personalPerks.length > 0 && (
+        <Card className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search perks by name, description, card, or merchant..."
+                value={perkSearchQuery}
+                onChange={(e) => setPerkSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedCard} onValueChange={setSelectedCard}>
+                <SelectTrigger className="w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by card" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cards</SelectItem>
+                  {personalCards.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPerkSearchQuery('');
+                    setSelectedCard('all');
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Showing {filteredPerks.length} of {personalPerks.length} perks</span>
+              {perkSearchQuery && (
+                <Badge variant="secondary">
+                  Search: "{perkSearchQuery}"
+                </Badge>
+              )}
+              {selectedCard !== 'all' && (
+                <Badge variant="secondary">
+                  Card: {personalCards.find(c => c.id === selectedCard)?.name}
+                </Badge>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {perksLoading || cardsLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -151,7 +255,7 @@ export default function PerksPage() {
             <Card key={i} className="h-48 animate-pulse bg-muted" />
           ))}
         </div>
-      ) : perksWithMerchants.length === 0 ? (
+      ) : personalPerks.length === 0 ? (
         <Card className="p-12">
           <div className="text-center space-y-4">
             <div className="mx-auto bg-primary/10 p-4 rounded-xl w-fit">
@@ -164,7 +268,7 @@ export default function PerksPage() {
               </p>
             </div>
             <AddPerkDialog 
-              cards={cards}
+              cards={personalCards}
               onAdd={(data) => addPerkMutation.mutateAsync(data)}
               trigger={
                 <Button size="lg" data-testid="button-add-first-perk">
@@ -175,9 +279,33 @@ export default function PerksPage() {
             />
           </div>
         </Card>
+      ) : hasActiveFilters && filteredPerks.length === 0 ? (
+        <Card className="p-12">
+          <div className="text-center space-y-4">
+            <div className="mx-auto bg-muted/10 p-4 rounded-xl w-fit">
+              <Search className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">No perks found</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Try adjusting your search or filter criteria
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPerkSearchQuery('');
+                setSelectedCard('all');
+              }}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear filters
+            </Button>
+          </div>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {perksWithMerchants.map((perk) => {
+          {filteredPerks.map((perk) => {
             const status = getPerkStatus(perk);
             return (
               <Card key={perk.id} className="hover-elevate" data-testid={`perk-card-${perk.id}`}>
