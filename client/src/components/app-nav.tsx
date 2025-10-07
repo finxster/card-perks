@@ -45,35 +45,7 @@ export function AppNav() {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
-              <img src={cardperksLogo} alt="CardPerks Logo" className="h-8 w-auto" />
-              <span>CardPerks</span>
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location === item.path;
-                return (
-                  <Link key={item.path} href={item.path}>
-                    <Button
-                      variant={isActive ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className="gap-2"
-                      data-testid={`nav-${item.label.toLowerCase()}`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            
+            {/* Mobile menu - moved to left side */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -86,7 +58,7 @@ export function AppNav() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px]">
+              <SheetContent side="left" className="w-[280px]">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-primary" />
@@ -117,6 +89,35 @@ export function AppNav() {
                 </div>
               </SheetContent>
             </Sheet>
+
+            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
+              <img src={cardperksLogo} alt="CardPerks Logo" className="h-8 w-auto" />
+              <span>CardPerks</span>
+            </Link>
+            
+            <div className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.path;
+                return (
+                  <Link key={item.path} href={item.path}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="gap-2"
+                      data-testid={`nav-${item.label.toLowerCase()}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
