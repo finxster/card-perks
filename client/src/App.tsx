@@ -18,6 +18,15 @@ import Crowdsource from "@/pages/crowdsource";
 import Admin from "@/pages/admin";
 import { useEffect } from "react";
 import { useAuth } from '@/lib/auth';
+import AcceptInvite from '@/pages/accept-invite';
+
+function VerifyRedirect({ token }: { token: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation(`/verify-email?token=${token}`);
+  }, [token, setLocation]);
+  return null;
+}
 
 function HomeRedirect() {
   const { user, isLoading } = useAuth();
@@ -40,37 +49,35 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />
-      
+      <Route path="/auth/verify/:token">
+        {(params) => <VerifyRedirect token={params.token} />}
+      </Route>
+      <Route path="/accept-invite" component={AcceptInvite} />
       <Route path="/dashboard">
         <ProtectedRoute>
           <Dashboard />
         </ProtectedRoute>
       </Route>
-      
       <Route path="/household">
         <ProtectedRoute>
           <Household />
         </ProtectedRoute>
       </Route>
-      
       <Route path="/perks">
         <ProtectedRoute>
           <Perks />
         </ProtectedRoute>
       </Route>
-      
       <Route path="/crowdsource">
         <ProtectedRoute>
           <Crowdsource />
         </ProtectedRoute>
       </Route>
-      
       <Route path="/admin">
         <ProtectedRoute adminOnly>
           <Admin />
         </ProtectedRoute>
       </Route>
-      
       <Route component={NotFound} />
     </Switch>
   );

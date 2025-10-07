@@ -44,12 +44,15 @@ const adminMiddleware = (req: AuthRequest, res: Response, next: NextFunction) =>
 
 async function sendEmail(type: string, to: string, data: any) {
   try {
-    const response = await fetch(`${CLOUDFLARE_EMAIL_WORKER}/${type}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, ...data }),
-    });
-    return response.ok;
+          const response = await fetch(`${CLOUDFLARE_EMAIL_WORKER}/${type}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-worker-key': JWT_SECRET,
+            },
+            body: JSON.stringify({ to, ...data }),
+          });
+          return response.ok;
   } catch (error) {
     console.error('Email send failed:', error);
     return false;
@@ -96,10 +99,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      await sendEmail('verify', email, {
+      const emailSent = await sendEmail('verify', email, {
         name,
+        token,
         verificationUrl: `${req.protocol}://${req.get('host')}/verify-email?token=${token}`,
       });
+
+      if (!emailSent) {
+        console.error(`Failed to send verification email to ${email} for user ${user.id}`);
+        return res.status(500).json({ message: 'Failed to send verification email. Please try again later.' });
+      }
 
       res.json({ success: true, message: 'Registration successful. Please check your email.' });
     } catch (error: any) {
@@ -379,11 +388,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      await sendEmail('invite', email, {
+      const emailSent = await sendEmail('invite', email, {
+        token,
         householdName: household.name,
         inviterName: req.user.name,
-        inviteUrl: `${req.protocol}://${req.get('host')}/accept-invite?token=${token}`,
+        inviteToken: `${token}`,
       });
+
+      if (!emailSent) {
+        console.error(`Failed to send household invite email to ${email} for household ${household.id}`);
+        return res.status(500).json({ message: 'Failed to send invitation email. Please try again later.' });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
