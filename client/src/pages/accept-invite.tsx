@@ -42,7 +42,7 @@ export default function AcceptInvite() {
   }, [token, setLocation, toast]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">{/* Adjusting for nav and footer */}
       {loading ? (
         <div>Accepting invitation...</div>
       ) : (

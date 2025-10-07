@@ -37,7 +37,7 @@ export default function VerifyEmail() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-household/5 p-4">
+    <div className="flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-household/5 p-4 min-h-[calc(100vh-8rem)]">{/* Adjusting for nav and footer */}
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           {status === 'loading' && (

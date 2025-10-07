@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ProtectedRoute } from "@/components/protected-route";
 import { AppNav } from "@/components/app-nav";
+import { AppFooter } from "@/components/app-footer";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -16,6 +17,8 @@ import Household from "@/pages/household";
 import Perks from "@/pages/perks";
 import Crowdsource from "@/pages/crowdsource";
 import Admin from "@/pages/admin";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import TermsOfUse from "@/pages/terms-of-use";
 import { useEffect } from "react";
 import { useAuth } from '@/lib/auth';
 import AcceptInvite from '@/pages/accept-invite';
@@ -78,6 +81,8 @@ function Router() {
           <Admin />
         </ProtectedRoute>
       </Route>
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/terms-of-use" component={TermsOfUse} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -89,8 +94,13 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <TooltipProvider>
-            <AppNav />
-            <Router />
+            <div className="min-h-screen flex flex-col">
+              <AppNav />
+              <main className="flex-1">
+                <Router />
+              </main>
+              <AppFooter />
+            </div>
             <Toaster />
           </TooltipProvider>
         </AuthProvider>
