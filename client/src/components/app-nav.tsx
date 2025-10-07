@@ -20,6 +20,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut, Menu } from 'lucide-react';
 import { useState } from 'react';
+import cardperksLogo from '@/assets/cardperks_logo.png';
 
 export function AppNav() {
   const { user, logout } = useAuth();
@@ -45,7 +46,7 @@ export function AppNav() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
-              <CreditCard className="h-6 w-6 text-primary" />
+              <img src={cardperksLogo} alt="CardPerks Logo" className="h-8 w-auto" />
               <span>CardPerks</span>
             </Link>
             

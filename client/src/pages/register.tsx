@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Mail } from 'lucide-react';
+import cardperksLogo from '@/assets/cardperks_logo.png';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -95,7 +96,7 @@ export default function Register() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto bg-primary/10 p-3 rounded-xl w-fit">
-            <CreditCard className="h-8 w-8 text-primary" />
+            <img src={cardperksLogo} alt="CardPerks Logo" className="h-8 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
           <CardDescription>
