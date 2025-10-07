@@ -34,13 +34,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Home, Plus, Users, Mail, CreditCard } from 'lucide-react';
+import { Home, Plus, Users, Mail, CreditCard, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CardTile } from '@/components/cards/card-tile';
 import { AddCardDialog } from '@/components/cards/add-card-dialog';
 import { EditCardDialog } from '@/components/cards/edit-card-dialog';
+import { useAuth } from '@/lib/auth';
 
 const inviteSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -49,11 +50,13 @@ const inviteSchema = z.object({
 type InviteForm = z.infer<typeof inviteSchema>;
 
 export default function Household() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CardType | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const { data: household, isLoading } = useQuery<HouseholdType | null>({
     queryKey: ['/api/household/my'],
@@ -143,6 +146,29 @@ export default function Household() {
         description: 'Your card has been removed.',
       });
       setDeletingCardId(null);
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (memberId: string) =>
+      apiRequest('DELETE', `/api/household/members/${memberId}`, {}),
+    onSuccess: () => {
+      // Force refresh both members and household data
+      queryClient.invalidateQueries({ queryKey: ['/api/household/members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/household/my'] });
+      toast({
+        title: 'Member removed',
+        description: 'The member has been removed from your household.',
+      });
+      setRemovingMemberId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error removing member',
+        description: error.message || 'Failed to remove member from household.',
+        variant: 'destructive',
+      });
+      setRemovingMemberId(null);
     },
   });
 
@@ -395,9 +421,22 @@ export default function Household() {
                         </p>
                       </div>
                     </div>
-                    {member.isOwner && (
-                      <Badge variant="secondary">Owner</Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {member.isOwner && (
+                        <Badge variant="secondary">Owner</Badge>
+                      )}
+                      {household?.ownerId === user?.id && !member.isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRemovingMemberId(member.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          data-testid={`button-remove-member-${member.id}`}
+                        >
+                          <UserX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -428,6 +467,27 @@ export default function Household() {
                 data-testid="button-confirm-delete"
               >
                 Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!removingMemberId} onOpenChange={(open) => !open && setRemovingMemberId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove Household Member</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to remove this member from your household? They will lose access to shared cards and perks.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-remove-member">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => removingMemberId && removeMemberMutation.mutate(removingMemberId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-remove-member"
+              >
+                Remove Member
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -39,7 +39,7 @@ export default function Dashboard() {
   const { data: perks = [], isLoading: perksLoading } = useQuery<Perk[]>({
     queryKey: ['/api/perks'],
   });
-
+  
   const { data: merchants = [] } = useQuery<Merchant[]>({
     queryKey: ['/api/merchants'],
   });
@@ -175,31 +175,31 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+            <div className="flex-shrink-0">
               <h1 className="text-3xl font-bold">Welcome back, {user?.name}</h1>
               <p className="text-muted-foreground mt-1">
                 Discover the best perks for your shopping
               </p>
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {stats.map((stat) => (
-              <Card key={stat.label}>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {stat.label}
-                  </CardTitle>
-                  <stat.icon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold" data-testid={`stat-${stat.label.toLowerCase().replace(' ', '-')}`}>
-                    {stat.value}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 lg:min-w-0 lg:flex-1 lg:max-w-2xl">
+              {stats.map((stat) => (
+                <Card key={stat.label} className="lg:min-w-0">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 p-4">
+                    <CardTitle className="text-xs lg:text-sm font-medium truncate">
+                      {stat.label}
+                    </CardTitle>
+                    <stat.icon className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="text-lg lg:text-xl font-bold truncate" data-testid={`stat-${stat.label.toLowerCase().replace(' ', '-')}`}>
+                      {stat.value}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
 

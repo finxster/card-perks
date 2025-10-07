@@ -446,6 +446,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove household member
+  app.delete('/api/household/members/:memberId', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const { memberId } = req.params;
+      
+      if (!memberId || typeof memberId !== 'string') {
+        return res.status(400).json({ message: 'Invalid member ID' });
+      }
+
+      // Get user's household
+      const household = await storage.getUserHousehold(req.userId!);
+      if (!household) {
+        return res.status(404).json({ message: 'You are not in a household' });
+      }
+
+      // Check if user is the owner
+      if (household.ownerId !== req.userId) {
+        return res.status(403).json({ message: 'Only the household owner can remove members' });
+      }
+
+      // Check if trying to remove self
+      if (memberId === req.userId) {
+        return res.status(400).json({ message: 'You cannot remove yourself. Delete the household instead.' });
+      }
+
+      // Remove the member
+      const removed = await storage.removeHouseholdMember(household.id, memberId);
+      
+      if (!removed) {
+        return res.status(404).json({ message: 'Member not found or could not be removed' });
+      }
+
+      res.json({ success: true, message: 'Member removed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Crowdsourcing Routes
   app.post('/api/crowdsourcing/merchant', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {

@@ -26,6 +26,7 @@ export interface IStorage {
   createHousehold(household: InsertHousehold & { ownerId: string }): Promise<Household>;
   getHouseholdMembers(householdId: string): Promise<(HouseholdMember & { user: User })[]>;
   addHouseholdMember(householdId: string, userId: string): Promise<HouseholdMember>;
+  removeHouseholdMember(householdId: string, userId: string): Promise<boolean>;
   getUserHousehold(userId: string): Promise<Household | undefined>;
 
   // Cards
@@ -125,6 +126,16 @@ export class DatabaseStorage implements IStorage {
       userId,
     }).returning();
     return member;
+  }
+
+  async removeHouseholdMember(householdId: string, userId: string): Promise<boolean> {
+    const result = await db.delete(householdMembers)
+      .where(and(
+        eq(householdMembers.householdId, householdId),
+        eq(householdMembers.userId, userId)
+      ));
+    
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getUserHousehold(userId: string): Promise<Household | undefined> {
