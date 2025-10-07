@@ -24,6 +24,7 @@ export interface IStorage {
   getHousehold(id: string): Promise<Household | undefined>;
   getHouseholdByOwnerId(ownerId: string): Promise<Household | undefined>;
   createHousehold(household: InsertHousehold & { ownerId: string }): Promise<Household>;
+  deleteHousehold(id: string): Promise<boolean>;
   getHouseholdMembers(householdId: string): Promise<(HouseholdMember & { user: User })[]>;
   addHouseholdMember(householdId: string, userId: string): Promise<HouseholdMember>;
   removeHouseholdMember(householdId: string, userId: string): Promise<boolean>;
@@ -40,6 +41,7 @@ export interface IStorage {
   // Perks
   getPerk(id: string): Promise<Perk | undefined>;
   getUserPerks(userId: string): Promise<Perk[]>;
+  getUserAccessiblePerks(userId: string): Promise<Perk[]>;
   getCardPerks(cardId: string): Promise<Perk[]>;
   getMerchantPerks(merchantId: string): Promise<Perk[]>;
   createPerk(perk: InsertPerk & { createdBy: string }): Promise<Perk>;
@@ -105,6 +107,11 @@ export class DatabaseStorage implements IStorage {
       userId: household.ownerId,
     });
     return newHousehold;
+  }
+
+  async deleteHousehold(id: string): Promise<boolean> {
+    const result = await db.delete(households).where(eq(households.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getHouseholdMembers(householdId: string): Promise<(HouseholdMember & { user: User })[]> {
@@ -218,6 +225,30 @@ export class DatabaseStorage implements IStorage {
 
   async getUserPerks(userId: string): Promise<Perk[]> {
     return await db.select().from(perks).where(eq(perks.createdBy, userId));
+  }
+
+  async getUserAccessiblePerks(userId: string): Promise<Perk[]> {
+    // Get user's personal cards
+    const userCards = await this.getUserCards(userId);
+    let allAccessibleCards = [...userCards];
+    
+    // Get household cards if user is in a household
+    const household = await this.getUserHousehold(userId);
+    if (household) {
+      const householdCards = await this.getHouseholdCards(household.id);
+      allAccessibleCards = [...allAccessibleCards, ...householdCards];
+    }
+    
+    const cardIds = allAccessibleCards.map(card => card.id);
+    
+    if (cardIds.length === 0) {
+      return [];
+    }
+    
+    // Get all perks for cards the user has access to
+    return await db.select().from(perks).where(
+      or(...cardIds.map(cardId => eq(perks.cardId, cardId)))
+    );
   }
 
   async getCardPerks(cardId: string): Promise<Perk[]> {

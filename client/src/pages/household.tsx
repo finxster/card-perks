@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { insertHouseholdSchema, insertCardSchema, type InsertCard, type Card as CardType, type User, type Household as HouseholdType } from '@shared/schema';
+import { insertHouseholdSchema, insertCardSchema, type InsertCard, type Card as CardType, type User, type Household as HouseholdType, type Perk } from '@shared/schema';
 import { z } from 'zod';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -34,13 +34,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Home, Plus, Users, Mail, CreditCard, UserX } from 'lucide-react';
+import { Home, Plus, Users, Mail, CreditCard, UserX, Trash, Gift } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CardTile } from '@/components/cards/card-tile';
 import { AddCardDialog } from '@/components/cards/add-card-dialog';
 import { EditCardDialog } from '@/components/cards/edit-card-dialog';
+import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
+import { PerkList } from '@/components/perks/perk-list';
 import { useAuth } from '@/lib/auth';
 
 const inviteSchema = z.object({
@@ -57,6 +59,7 @@ export default function Household() {
   const [editingCard, setEditingCard] = useState<CardType | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [deletingHousehold, setDeletingHousehold] = useState(false);
 
   const { data: household, isLoading } = useQuery<HouseholdType | null>({
     queryKey: ['/api/household/my'],
@@ -72,7 +75,14 @@ export default function Household() {
     enabled: !!household,
   });
 
+  const { data: perks = [] } = useQuery<Perk[]>({
+    queryKey: ['/api/perks'],
+    enabled: !!household,
+  });
+
   const householdCards = cards.filter(card => card.isHousehold);
+  const householdCardIds = householdCards.map(card => card.id);
+  const householdPerks = perks.filter(perk => householdCardIds.includes(perk.cardId));
 
   const createForm = useForm<z.infer<typeof insertHouseholdSchema>>({
     resolver: zodResolver(insertHouseholdSchema),
@@ -149,6 +159,17 @@ export default function Household() {
     },
   });
 
+  const addPerkMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', '/api/perks', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      toast({
+        title: 'Perk added',
+        description: 'Your household perk has been added successfully.',
+      });
+    },
+  });
+
   const removeMemberMutation = useMutation({
     mutationFn: (memberId: string) =>
       apiRequest('DELETE', `/api/household/members/${memberId}`, {}),
@@ -169,6 +190,28 @@ export default function Household() {
         variant: 'destructive',
       });
       setRemovingMemberId(null);
+    },
+  });
+
+  const deleteHouseholdMutation = useMutation({
+    mutationFn: () => apiRequest('DELETE', '/api/household', {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/household/my'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/household/members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cards'] });
+      toast({
+        title: 'Household deleted',
+        description: 'Your household has been deleted successfully.',
+      });
+      setDeletingHousehold(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error deleting household',
+        description: error.message || 'Failed to delete household.',
+        variant: 'destructive',
+      });
+      setDeletingHousehold(false);
     },
   });
 
@@ -276,65 +319,83 @@ export default function Household() {
                 Manage your household and invite members
               </p>
             </div>
-            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-invite-member">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Invite Member
+            <div className="flex items-center gap-2">
+              {/* Invite Member button - only for owners */}
+              {household?.ownerId === user?.id && (
+                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-invite-member">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Invite Member
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite Household Member</DialogTitle>
+                      <DialogDescription>
+                        Send an invitation email to add a new member
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...inviteForm}>
+                      <form
+                        onSubmit={inviteForm.handleSubmit((data) =>
+                          inviteMutation.mutate(data)
+                        )}
+                        className="space-y-4"
+                      >
+                        <FormField
+                          control={inviteForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email Address</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="member@example.com"
+                                  {...field}
+                                  data-testid="input-invite-email"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setInviteDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={inviteMutation.isPending}
+                            data-testid="button-send-invite"
+                          >
+                            {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              )}
+              
+              {/* Delete household button - only for owners */}
+              {household?.ownerId === user?.id && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeletingHousehold(true)}
+                  data-testid="button-delete-household"
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete Household
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Invite Household Member</DialogTitle>
-                  <DialogDescription>
-                    Send an invitation email to add a new member
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...inviteForm}>
-                  <form
-                    onSubmit={inviteForm.handleSubmit((data) =>
-                      inviteMutation.mutate(data)
-                    )}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={inviteForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="email"
-                              placeholder="member@example.com"
-                              {...field}
-                              data-testid="input-invite-email"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setInviteDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={inviteMutation.isPending}
-                        data-testid="button-send-invite"
-                      >
-                        {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+              )}
+            </div>
           </div>
         </div>
 
@@ -349,16 +410,19 @@ export default function Household() {
                 {householdCards.length} {householdCards.length === 1 ? 'card' : 'cards'} shared with household
               </CardDescription>
             </div>
-            <AddCardDialog
-              onAdd={(data) => addCardMutation.mutateAsync(data)}
-              isHousehold={true}
-              trigger={
-                <Button size="sm" data-testid="button-add-household-card">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Card
-                </Button>
-              }
-            />
+            {/* Add Card button - only for owners */}
+            {household?.ownerId === user?.id && (
+              <AddCardDialog
+                onAdd={(data) => addCardMutation.mutateAsync(data)}
+                isHousehold={true}
+                trigger={
+                  <Button size="sm" data-testid="button-add-household-card">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Card
+                  </Button>
+                }
+              />
+            )}
           </CardHeader>
           <CardContent>
             {householdCards.length === 0 ? (
@@ -377,6 +441,45 @@ export default function Household() {
                   />
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="h-5 w-5" />
+                Household Perks
+              </CardTitle>
+              <CardDescription>
+                {householdPerks.length} {householdPerks.length === 1 ? 'perk' : 'perks'} available from household cards
+              </CardDescription>
+            </div>
+            {/* Add Perk button - only for owners */}
+            {household?.ownerId === user?.id && householdCards.length > 0 && (
+              <AddPerkDialog
+                cards={householdCards}
+                onAdd={(data) => addPerkMutation.mutateAsync(data)}
+                trigger={
+                  <Button size="sm" data-testid="button-add-household-perk">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Perk
+                  </Button>
+                }
+              />
+            )}
+          </CardHeader>
+          <CardContent>
+            {householdPerks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {householdCards.length === 0 
+                  ? "Add household cards first to start adding perks!"
+                  : "No perks yet. Add a perk to get started!"
+                }
+              </div>
+            ) : (
+              <PerkList perks={householdPerks} />
             )}
           </CardContent>
         </Card>
@@ -488,6 +591,29 @@ export default function Household() {
                 data-testid="button-confirm-remove-member"
               >
                 Remove Member
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete household confirmation dialog */}
+        <AlertDialog open={deletingHousehold} onOpenChange={setDeletingHousehold}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Household</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this household? This action cannot be undone. All members will be removed, and all shared cards and perks will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-household">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteHouseholdMutation.mutate()}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete-household"
+                disabled={deleteHouseholdMutation.isPending}
+              >
+                {deleteHouseholdMutation.isPending ? 'Deleting...' : 'Delete Household'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

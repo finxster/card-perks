@@ -21,7 +21,21 @@ import {
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Home, Plus, TrendingUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Home, Plus, TrendingUp, Search, ChevronDown, ChevronUp, Filter, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Dashboard() {
@@ -31,6 +45,12 @@ export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
   const [editingPerk, setEditingPerk] = useState<Perk | null>(null);
   const [deletingPerkId, setDeletingPerkId] = useState<string | null>(null);
+  
+  // Perk search and filtering state
+  const [perkSearchQuery, setPerkSearchQuery] = useState('');
+  const [selectedCard, setSelectedCard] = useState<string>('all');
+  const [personalPerksExpanded, setPersonalPerksExpanded] = useState(true);
+  const [householdPerksExpanded, setHouseholdPerksExpanded] = useState(true);
 
   const { data: cards = [], isLoading: cardsLoading } = useQuery<(CardType & { perkCount: number })[]>({
     queryKey: ['/api/cards'],
@@ -39,7 +59,7 @@ export default function Dashboard() {
   const { data: perks = [], isLoading: perksLoading } = useQuery<Perk[]>({
     queryKey: ['/api/perks'],
   });
-  
+
   const { data: merchants = [] } = useQuery<Merchant[]>({
     queryKey: ['/api/merchants'],
   });
@@ -165,6 +185,42 @@ export default function Dashboard() {
   const personalCards = cards.filter((card) => !card.isHousehold);
   const householdCards = cards.filter((card) => card.isHousehold);
 
+  // Filter perks based on card type
+  const personalCardIds = personalCards.map(card => card.id);
+  const householdCardIds = householdCards.map(card => card.id);
+  
+  const personalPerks = perksWithDetails.filter(perk => perk.cardId && personalCardIds.includes(perk.cardId));
+  const householdPerks = perksWithDetails.filter(perk => perk.cardId && householdCardIds.includes(perk.cardId));
+
+  // Search and filter logic
+  const filterPerks = (perks: typeof perksWithDetails) => {
+    let filtered = perks;
+
+    // Apply search filter
+    if (perkSearchQuery.trim()) {
+      const query = perkSearchQuery.toLowerCase();
+      filtered = filtered.filter(perk => 
+        perk.name?.toLowerCase().includes(query) ||
+        perk.description?.toLowerCase().includes(query) ||
+        perk.card?.name?.toLowerCase().includes(query) ||
+        perk.merchant?.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply card filter
+    if (selectedCard !== 'all') {
+      filtered = filtered.filter(perk => perk.cardId === selectedCard);
+    }
+
+    return filtered;
+  };
+
+  const filteredPersonalPerks = filterPerks(personalPerks);
+  const filteredHouseholdPerks = filterPerks(householdPerks);
+
+  const hasActiveFilters = perkSearchQuery.trim() !== '' || selectedCard !== 'all';
+  const totalFilteredPerks = filteredPersonalPerks.length + filteredHouseholdPerks.length;
+
   const stats = [
     { label: 'Total Cards', value: cards.length, icon: TrendingUp },
     { label: 'Active Perks', value: perks.length, icon: TrendingUp },
@@ -281,7 +337,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Your Perks</h2>
             {cards.length > 0 && (
@@ -297,9 +353,71 @@ export default function Dashboard() {
               />
             )}
           </div>
+
+          {/* Search and Filter Controls */}
+          {(personalPerks.length > 0 || householdPerks.length > 0) && (
+            <Card className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search perks by name, description, card, or merchant..."
+                    value={perkSearchQuery}
+                    onChange={(e) => setPerkSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedCard} onValueChange={setSelectedCard}>
+                    <SelectTrigger className="w-[180px]">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter by card" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cards</SelectItem>
+                      {cards.map((card) => (
+                        <SelectItem key={card.id} value={card.id}>
+                          {card.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setPerkSearchQuery('');
+                        setSelectedCard('all');
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {hasActiveFilters && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Showing {totalFilteredPerks} of {personalPerks.length + householdPerks.length} perks</span>
+                  {perkSearchQuery && (
+                    <Badge variant="secondary">
+                      Search: "{perkSearchQuery}"
+                    </Badge>
+                  )}
+                  {selectedCard !== 'all' && (
+                    <Badge variant="secondary">
+                      Card: {cards.find(c => c.id === selectedCard)?.name}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+          
           {perksLoading ? (
             <Card className="h-32 animate-pulse bg-muted" />
-          ) : perks.length === 0 ? (
+          ) : (personalPerks.length === 0 && householdPerks.length === 0) ? (
             <Card className="p-12">
               <div className="text-center space-y-4">
                 <div className="mx-auto bg-primary/10 p-4 rounded-xl w-fit">
@@ -323,13 +441,89 @@ export default function Dashboard() {
                 />
               </div>
             </Card>
+          ) : hasActiveFilters && totalFilteredPerks === 0 ? (
+            <Card className="p-12">
+              <div className="text-center space-y-4">
+                <div className="mx-auto bg-muted/10 p-4 rounded-xl w-fit">
+                  <Search className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">No perks found</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Try adjusting your search or filter criteria
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPerkSearchQuery('');
+                    setSelectedCard('all');
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear filters
+                </Button>
+              </div>
+            </Card>
           ) : (
-            <PerkList
-              perks={perksWithDetails}
-              showAddButton={false}
-              onEdit={setEditingPerk}
-              onDelete={setDeletingPerkId}
-            />
+            <div className="space-y-4">
+              {filteredPersonalPerks.length > 0 && (
+                <Collapsible open={personalPerksExpanded} onOpenChange={setPersonalPerksExpanded}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+                      <h3 className="text-lg font-semibold text-muted-foreground flex items-center gap-2">
+                        Personal Perks
+                        <Badge variant="secondary" className="ml-2">
+                          {filteredPersonalPerks.length}
+                        </Badge>
+                      </h3>
+                      {personalPerksExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2">
+                    <PerkList
+                      perks={filteredPersonalPerks}
+                      showAddButton={false}
+                      onEdit={setEditingPerk}
+                      onDelete={setDeletingPerkId}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {filteredHouseholdPerks.length > 0 && (
+                <Collapsible open={householdPerksExpanded} onOpenChange={setHouseholdPerksExpanded}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+                      <h3 className="text-lg font-semibold text-muted-foreground flex items-center gap-2">
+                        <Home className="h-5 w-5" />
+                        Household Perks
+                        <Badge variant="secondary" className="ml-2">
+                          {filteredHouseholdPerks.length}
+                        </Badge>
+                      </h3>
+                      {householdPerksExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2">
+                    <PerkList
+                      perks={filteredHouseholdPerks}
+                      showAddButton={false}
+                      onEdit={setEditingPerk}
+                      onDelete={setDeletingPerkId}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </div>
           )}
         </div>
       </div>

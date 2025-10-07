@@ -32,7 +32,6 @@ export function PerkList({ perks, onAdd, showAddButton = true, onEdit, onDelete 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-lg">Your Perks</h3>
         {showAddButton && onAdd && (
           <Button onClick={onAdd} size="sm" data-testid="button-add-perk">
             <Plus className="h-4 w-4 mr-2" />

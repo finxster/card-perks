@@ -228,7 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Perks Routes
   app.get('/api/perks', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-      const perks = await storage.getUserPerks(req.userId!);
+      const perks = await storage.getUserAccessiblePerks(req.userId!);
       res.json(perks);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -479,6 +479,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ success: true, message: 'Member removed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete household
+  app.delete('/api/household', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      // Get user's household
+      const household = await storage.getUserHousehold(req.userId!);
+      if (!household) {
+        return res.status(404).json({ message: 'You are not in a household' });
+      }
+
+      // Check if user is the owner
+      if (household.ownerId !== req.userId) {
+        return res.status(403).json({ message: 'Only the household owner can delete the household' });
+      }
+
+      // Delete the household (this will cascade delete members and related data)
+      const deleted = await storage.deleteHousehold(household.id);
+      
+      if (!deleted) {
+        return res.status(500).json({ message: 'Failed to delete household' });
+      }
+
+      res.json({ success: true, message: 'Household deleted successfully' });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
