@@ -189,6 +189,11 @@ export const insertPerkSchema = createInsertSchema(perks).omit({
   id: true,
   createdBy: true,
   createdAt: true,
+}).extend({
+  expirationDate: z.preprocess(
+    (val) => val ? new Date(val as string) : undefined,
+    z.date().optional()
+  ),
 });
 
 export const insertCrowdsourcingSchema = createInsertSchema(crowdsourcing).omit({

@@ -2,11 +2,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, TrendingUp, Plus, Edit2, Trash2 } from 'lucide-react';
-import type { Perk, Merchant } from '@shared/schema';
+import type { Perk, Merchant, Card as CardType } from '@shared/schema';
 import { format, isPast, differenceInDays } from 'date-fns';
+
 
 interface PerkWithMerchant extends Perk {
   merchant?: Merchant;
+  card?: CardType;
 }
 
 interface PerkListProps {
@@ -57,15 +59,20 @@ export function PerkList({ perks, onAdd, showAddButton = true, onEdit, onDelete 
               <Card key={perk.id} className="hover-elevate" data-testid={`perk-item-${perk.id}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <CardTitle className="text-base" data-testid={`text-perk-name-${perk.id}`}>
-                        {perk.name}
-                      </CardTitle>
-                      {perk.merchant && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {perk.merchant.name}
-                        </p>
-                      )}
+                    <div className="flex-1 space-y-0.5">
+                      <CardTitle className="text-base" data-testid={`text-perk-name-${perk.id}`}>{perk.name}</CardTitle>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {perk.card && (
+                          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            <span className="font-medium">Card:</span> {perk.card.name}
+                          </span>
+                        )}
+                        {perk.merchant && (
+                          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            <span className="font-medium">Merchant:</span> {perk.merchant.name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {perk.value && (
                       <Badge variant="secondary" className="bg-personal/10 text-personal">

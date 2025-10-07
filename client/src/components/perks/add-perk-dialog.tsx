@@ -73,9 +73,14 @@ export function AddPerkDialog({ cards, onAdd, trigger }: AddPerkDialogProps) {
   const handleSubmit = async (data: PerkFormData) => {
     setIsSubmitting(true);
     try {
+      let expirationDate: Date | undefined = undefined;
+      if (data.expirationDate) {
+        // Only convert if it's not already a Date
+        expirationDate = typeof data.expirationDate === 'string' ? new Date(data.expirationDate) : data.expirationDate;
+      }
       const perkData: InsertPerk = {
         ...data,
-        expirationDate: data.expirationDate ? new Date(data.expirationDate) : undefined,
+        expirationDate,
       };
       await onAdd(perkData);
       form.reset();

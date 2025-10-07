@@ -40,6 +40,17 @@ export default function Dashboard() {
     queryKey: ['/api/perks'],
   });
 
+  const { data: merchants = [] } = useQuery<Merchant[]>({
+    queryKey: ['/api/merchants'],
+  });
+
+  // Map perks to include card and merchant info for PerkList
+  const perksWithDetails = perks.map(perk => ({
+    ...perk,
+    card: cards.find(card => card.id === perk.cardId),
+    merchant: merchants.find(merchant => merchant.id === perk.merchantId),
+  }));
+
   const { data: household } = useQuery<{ id: string; name: string }>({
     queryKey: ['/api/household/my'],
   });
@@ -314,7 +325,7 @@ export default function Dashboard() {
             </Card>
           ) : (
             <PerkList
-              perks={perks}
+              perks={perksWithDetails}
               showAddButton={false}
               onEdit={setEditingPerk}
               onDelete={setDeletingPerkId}
