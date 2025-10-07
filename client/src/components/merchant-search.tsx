@@ -9,7 +9,12 @@ import type { Merchant, Card as CardType } from '@shared/schema';
 
 interface MerchantSearchProps {
   onSearch: (query: string) => void;
-  results: (Merchant & { bestCard?: CardType; perkValue?: string })[];
+  results: (Merchant & {
+    matchingCards?: Array<{
+      card: CardType;
+      perks: any[];
+    }>;
+  })[];
   isSearching?: boolean;
 }
 
@@ -55,12 +60,6 @@ export function MerchantSearch({ onSearch, results, isSearching }: MerchantSearc
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg" data-testid={`text-merchant-name-${merchant.id}`}>{merchant.name}</CardTitle>
-                    {merchant.bestCard && (
-                      <Badge variant="secondary" className="bg-primary/10 text-primary">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        Best
-                      </Badge>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -73,20 +72,22 @@ export function MerchantSearch({ onSearch, results, isSearching }: MerchantSearc
                       </div>
                     )}
                   </div>
-                  
-                  {merchant.bestCard && (
-                    <div className="pt-2 border-t">
-                      <p className="text-sm font-medium mb-1">Recommended Card:</p>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-best-card-${merchant.id}`}>{merchant.bestCard.name}</p>
-                      {merchant.perkValue && (
-                        <Badge variant="secondary" className="mt-2 bg-personal/10 text-personal">
-                          {merchant.perkValue}
-                        </Badge>
-                      )}
+                  {/* Show all matching cards and their perks */}
+                  {merchant.matchingCards && merchant.matchingCards.length > 0 ? (
+                    <div className="pt-2 border-t space-y-2">
+                      <p className="text-sm font-medium mb-1">Your Cards & Perks:</p>
+                      {merchant.matchingCards.map(({ card, perks }) => (
+                        <div key={card.id} className="mb-2">
+                          <p className="text-sm text-muted-foreground font-semibold">{card.name}</p>
+                          {perks.map((perk: any) => (
+                            <Badge key={perk.id} variant="secondary" className="mt-1 bg-personal/10 text-personal">
+                              {perk.value}
+                            </Badge>
+                          ))}
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  
-                  {!merchant.bestCard && (
+                  ) : (
                     <p className="text-sm text-muted-foreground">
                       No perks available for this merchant
                     </p>

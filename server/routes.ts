@@ -280,29 +280,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
-      const merchants = await storage.searchMerchants(query);
-      
+      // Fetch all merchants and filter by query (case-insensitive)
+      const allMerchants = await storage.getAllMerchants();
+      const lowerQuery = query.toLowerCase();
+      const merchants = allMerchants.filter(m => m.name.toLowerCase().includes(lowerQuery));
+
       const results = await Promise.all(
         merchants.map(async (merchant) => {
           const merchantPerks = await storage.getMerchantPerks(merchant.id);
           const userCards = await storage.getUserCards(req.userId!);
-          
-          let bestCard = null;
-          let perkValue = null;
-          
-          for (const perk of merchantPerks) {
-            const card = userCards.find(c => c.id === perk.cardId);
-            if (card) {
-              bestCard = card;
-              perkValue = perk.value;
-              break;
-            }
-          }
-          
-          return { ...merchant, bestCard, perkValue };
+
+          // Collect all matching cards and their associated perks
+          const matchingCards = userCards
+            .map(card => {
+              const perksForCard = merchantPerks.filter(perk => perk.cardId === card.id);
+              if (perksForCard.length > 0) {
+                return {
+                  card,
+                  perks: perksForCard
+                };
+              }
+              return null;
+            })
+            .filter(Boolean);
+
+          return { ...merchant, matchingCards };
         })
       );
-      
+
       res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
