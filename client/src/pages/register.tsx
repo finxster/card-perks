@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,8 +13,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PasswordStrength } from '@/components/ui/password-strength';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Mail } from 'lucide-react';
 import cardperksLogo from '@/assets/cardperks_logo.png';
@@ -22,7 +24,12 @@ import cardperksLogo from '@/assets/cardperks_logo.png';
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/\d/, 'Password must contain at least one number')
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character'),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -41,7 +48,23 @@ export default function Register() {
       email: '',
       password: '',
     },
+    mode: 'onChange', // Enable real-time validation
   });
+
+  const passwordValue = form.watch('password');
+
+  // Check if password meets all requirements
+  const isPasswordValid = useMemo(() => {
+    if (!passwordValue) return false;
+    const rules = [
+      (pwd: string) => pwd.length >= 8,
+      (pwd: string) => /[A-Z]/.test(pwd),
+      (pwd: string) => /[a-z]/.test(pwd),
+      (pwd: string) => /\d/.test(pwd),
+      (pwd: string) => /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+    ];
+    return rules.every(rule => rule(passwordValue));
+  }, [passwordValue]);
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
@@ -150,14 +173,14 @@ export default function Register() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         placeholder="••••••••"
                         {...field}
                         data-testid="input-password"
                       />
                     </FormControl>
                     <FormMessage />
+                    <PasswordStrength password={passwordValue || ''} />
                   </FormItem>
                 )}
               />
@@ -165,11 +188,17 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isLoading || !isPasswordValid}
                 data-testid="button-register"
               >
                 {isLoading ? 'Creating account...' : 'Create Account'}
               </Button>
+              
+              {!isPasswordValid && passwordValue && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Please meet all password requirements to continue
+                </p>
+              )}
             </form>
           </Form>
 
