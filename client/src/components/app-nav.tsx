@@ -18,7 +18,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut, Menu } from 'lucide-react';
+import { CreditCard, LayoutDashboard, Home, TrendingUp, Shield, LogOut, Menu, Camera } from 'lucide-react';
 import { useState } from 'react';
 import cardperksLogo from '@/assets/cardperks_logo.png';
 
@@ -32,6 +32,7 @@ export function AppNav() {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/perks', label: 'Perks', icon: TrendingUp },
+    { path: '/ocr/upload', label: 'Upload Offers', icon: Camera },
     { path: '/household', label: 'Household', icon: Home },
     { path: '/crowdsource', label: 'Suggest', icon: CreditCard },
   ];

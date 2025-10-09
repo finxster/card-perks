@@ -42,6 +42,7 @@ import { CardTile } from '@/components/cards/card-tile';
 import { AddCardDialog } from '@/components/cards/add-card-dialog';
 import { EditCardDialog } from '@/components/cards/edit-card-dialog';
 import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
+import { EditPerkDialog } from '@/components/perks/edit-perk-dialog';
 import { PerkList } from '@/components/perks/perk-list';
 import { useAuth } from '@/lib/auth';
 
@@ -58,6 +59,8 @@ export default function Household() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CardType | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [editingPerk, setEditingPerk] = useState<Perk | null>(null);
+  const [deletingPerkId, setDeletingPerkId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [deletingHousehold, setDeletingHousehold] = useState(false);
 
@@ -82,7 +85,7 @@ export default function Household() {
 
   const householdCards = cards.filter(card => card.isHousehold);
   const householdCardIds = householdCards.map(card => card.id);
-  const householdPerks = perks.filter(perk => householdCardIds.includes(perk.cardId));
+  const householdPerks = perks.filter(perk => perk.cardId && householdCardIds.includes(perk.cardId));
 
   const createForm = useForm<z.infer<typeof insertHouseholdSchema>>({
     resolver: zodResolver(insertHouseholdSchema),
@@ -167,6 +170,32 @@ export default function Household() {
         title: 'Perk added',
         description: 'Your household perk has been added successfully.',
       });
+    },
+  });
+
+  const updatePerkMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest('PATCH', `/api/perks/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      toast({
+        title: 'Perk updated',
+        description: 'Your perk has been updated successfully.',
+      });
+      setEditingPerk(null);
+    },
+  });
+
+  const deletePerkMutation = useMutation({
+    mutationFn: (perkId: string) =>
+      apiRequest('DELETE', `/api/perks/${perkId}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/perks'] });
+      toast({
+        title: 'Perk deleted',
+        description: 'Your perk has been removed.',
+      });
+      setDeletingPerkId(null);
     },
   });
 
@@ -479,7 +508,12 @@ export default function Household() {
                 }
               </div>
             ) : (
-              <PerkList perks={householdPerks} />
+              <PerkList 
+                perks={householdPerks} 
+                onEdit={household?.ownerId === user?.id ? setEditingPerk : undefined}
+                onDelete={household?.ownerId === user?.id ? setDeletingPerkId : undefined}
+                showAddButton={false}
+              />
             )}
           </CardContent>
         </Card>
@@ -554,6 +588,16 @@ export default function Household() {
           onUpdate={(id, data) => updateCardMutation.mutateAsync({ id, data })}
         />
 
+        {editingPerk && (
+          <EditPerkDialog
+            perk={editingPerk}
+            cards={householdCards}
+            open={!!editingPerk}
+            onOpenChange={(open) => !open && setEditingPerk(null)}
+            onEdit={(id, data) => updatePerkMutation.mutateAsync({ id, data })}
+          />
+        )}
+
         <AlertDialog open={!!deletingCardId} onOpenChange={(open) => !open && setDeletingCardId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -568,6 +612,27 @@ export default function Household() {
                 onClick={() => deletingCardId && deleteCardMutation.mutate(deletingCardId)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 data-testid="button-confirm-delete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!deletingPerkId} onOpenChange={(open) => !open && setDeletingPerkId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Perk</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this perk? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-perk">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deletingPerkId && deletePerkMutation.mutate(deletingPerkId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete-perk"
               >
                 Delete
               </AlertDialogAction>

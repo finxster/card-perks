@@ -27,8 +27,9 @@ import { AddPerkDialog } from '@/components/perks/add-perk-dialog';
 import { EditPerkDialog } from '@/components/perks/edit-perk-dialog';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { TrendingUp, Edit2, Trash2, Calendar, Store, Search, Filter, X } from 'lucide-react';
+import { TrendingUp, Edit2, Trash2, Calendar, Store, Search, Filter, X, Camera } from 'lucide-react';
 import { format, isPast, differenceInDays } from 'date-fns';
+import { Link } from 'wouter';
 
 interface PerkWithMerchant extends Perk {
   merchant?: Merchant;
@@ -183,10 +184,18 @@ export default function PerksPage() {
             Manage all your credit card perks and rewards
           </p>
         </div>
-        <AddPerkDialog 
-          cards={personalCards} 
-          onAdd={(data) => addPerkMutation.mutateAsync(data)}
-        />
+        <div className="flex gap-2">
+          <Link href="/ocr/upload">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              Upload Offers
+            </Button>
+          </Link>
+          <AddPerkDialog 
+            cards={personalCards} 
+            onAdd={(data) => addPerkMutation.mutateAsync(data)}
+          />
+        </div>
       </div>
 
       {/* Search and Filter Controls */}

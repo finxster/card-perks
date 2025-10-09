@@ -19,6 +19,8 @@ import Crowdsource from "@/pages/crowdsource";
 import Admin from "@/pages/admin";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsOfUse from "@/pages/terms-of-use";
+import OCRUpload from "@/pages/ocr-upload";
+import OCRConfirm from "@/pages/ocr-confirm";
 import { useEffect } from "react";
 import { useAuth } from '@/lib/auth';
 import AcceptInvite from '@/pages/accept-invite';
@@ -69,6 +71,16 @@ function Router() {
       <Route path="/perks">
         <ProtectedRoute>
           <Perks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/ocr/upload">
+        <ProtectedRoute>
+          <OCRUpload />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/ocr/confirm">
+        <ProtectedRoute>
+          <OCRConfirm />
         </ProtectedRoute>
       </Route>
       <Route path="/crowdsource">

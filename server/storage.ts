@@ -1,8 +1,9 @@
 // Referenced from javascript_database blueprint
 import { db } from "./db";
-import { eq, and, or, like, desc } from "drizzle-orm";
+import { eq, and, or, like, desc, lt } from "drizzle-orm";
 import {
   users, households, householdMembers, cards, perks, merchants, crowdsourcing, verificationTokens,
+  ocrDraftPerks, ocrImages,
   type User, type InsertUser,
   type Household, type InsertHousehold,
   type HouseholdMember,
@@ -11,6 +12,8 @@ import {
   type Merchant, type InsertMerchant,
   type Crowdsourcing, type InsertCrowdsourcing,
   type VerificationToken,
+  type OcrDraftPerk, type InsertOcrDraftPerk,
+  type OcrImage, type InsertOcrImage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -67,6 +70,20 @@ export interface IStorage {
   createVerificationToken(data: Omit<VerificationToken, 'id' | 'createdAt'>): Promise<VerificationToken>;
   getVerificationToken(token: string): Promise<VerificationToken | undefined>;
   deleteVerificationToken(token: string): Promise<boolean>;
+
+  // OCR Draft Perks
+  createOcrDraftPerk(perk: InsertOcrDraftPerk & { userId: string }): Promise<OcrDraftPerk>;
+  getUserOcrDraftPerks(userId: string): Promise<OcrDraftPerk[]>;
+  updateOcrDraftPerk(id: string, data: Partial<OcrDraftPerk>): Promise<OcrDraftPerk | undefined>;
+  deleteOcrDraftPerk(id: string): Promise<boolean>;
+  deleteUserOcrDraftPerks(userId: string): Promise<boolean>;
+
+  // OCR Images
+  createOcrImage(image: InsertOcrImage & { userId: string }): Promise<OcrImage>;
+  getUserOcrImages(userId: string): Promise<OcrImage[]>;
+  getExpiredOcrImages(): Promise<OcrImage[]>;
+  updateOcrImage(id: string, data: Partial<OcrImage>): Promise<OcrImage | undefined>;
+  deleteOcrImage(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -343,6 +360,63 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVerificationToken(token: string): Promise<boolean> {
     const result = await db.delete(verificationTokens).where(eq(verificationTokens.token, token));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // OCR Draft Perks
+  async createOcrDraftPerk(perk: InsertOcrDraftPerk & { userId: string }): Promise<OcrDraftPerk> {
+    const [newPerk] = await db.insert(ocrDraftPerks).values(perk).returning();
+    return newPerk;
+  }
+
+  async getUserOcrDraftPerks(userId: string): Promise<OcrDraftPerk[]> {
+    return await db.select().from(ocrDraftPerks)
+      .where(eq(ocrDraftPerks.userId, userId))
+      .orderBy(desc(ocrDraftPerks.createdAt));
+  }
+
+  async updateOcrDraftPerk(id: string, data: Partial<OcrDraftPerk>): Promise<OcrDraftPerk | undefined> {
+    const [updated] = await db.update(ocrDraftPerks).set(data).where(eq(ocrDraftPerks.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteOcrDraftPerk(id: string): Promise<boolean> {
+    const result = await db.delete(ocrDraftPerks).where(eq(ocrDraftPerks.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async deleteUserOcrDraftPerks(userId: string): Promise<boolean> {
+    const result = await db.delete(ocrDraftPerks).where(eq(ocrDraftPerks.userId, userId));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // OCR Images
+  async createOcrImage(image: InsertOcrImage & { userId: string }): Promise<OcrImage> {
+    const [newImage] = await db.insert(ocrImages).values(image).returning();
+    return newImage;
+  }
+
+  async getUserOcrImages(userId: string): Promise<OcrImage[]> {
+    return await db.select().from(ocrImages)
+      .where(eq(ocrImages.userId, userId))
+      .orderBy(desc(ocrImages.createdAt));
+  }
+
+  async getExpiredOcrImages(): Promise<OcrImage[]> {
+    return await db.select().from(ocrImages)
+      .where(and(
+        eq(ocrImages.processed, true),
+        lt(ocrImages.expiresAt, new Date())
+      ));
+  }
+
+  async updateOcrImage(id: string, data: Partial<OcrImage>): Promise<OcrImage | undefined> {
+    const [updated] = await db.update(ocrImages).set(data).where(eq(ocrImages.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteOcrImage(id: string): Promise<boolean> {
+    const result = await db.delete(ocrImages).where(eq(ocrImages.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 }

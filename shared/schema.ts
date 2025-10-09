@@ -78,6 +78,33 @@ export const crowdsourcing = pgTable("crowdsourcing", {
   reviewedAt: timestamp("reviewed_at"),
 });
 
+// OCR draft perks for review before confirmation
+export const ocrDraftPerks = pgTable("ocr_draft_perks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  merchant: text("merchant").notNull(),
+  description: text("description").notNull(),
+  expiration: text("expiration"),
+  value: text("value"), // e.g., "5% cashback", "10x points"
+  status: text("status").notNull().default("inactive"), // active, inactive
+  imageUrl: text("image_url"), // Temporary Cloudflare R2 URL
+  extractedText: text("extracted_text"), // Full OCR text for reference
+  confirmed: boolean("confirmed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// OCR images table for tracking temporary uploads
+export const ocrImages = pgTable("ocr_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  url: text("url").notNull(),
+  cloudflareKey: text("cloudflare_key").notNull(), // For deletion
+  processed: boolean("processed").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Verification tokens for email verification and invites
 export const verificationTokens = pgTable("verification_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -156,6 +183,20 @@ export const crowdsourcingRelations = relations(crowdsourcing, ({ one }) => ({
   }),
 }));
 
+export const ocrDraftPerksRelations = relations(ocrDraftPerks, ({ one }) => ({
+  user: one(users, {
+    fields: [ocrDraftPerks.userId],
+    references: [users.id],
+  }),
+}));
+
+export const ocrImagesRelations = relations(ocrImages, ({ one }) => ({
+  user: one(users, {
+    fields: [ocrImages.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -196,6 +237,18 @@ export const insertPerkSchema = createInsertSchema(perks).omit({
   ),
 });
 
+export const insertOcrDraftPerkSchema = createInsertSchema(ocrDraftPerks).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+});
+
+export const insertOcrImageSchema = createInsertSchema(ocrImages).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+});
+
 export const insertCrowdsourcingSchema = createInsertSchema(crowdsourcing).omit({
   id: true,
   submittedBy: true,
@@ -222,6 +275,12 @@ export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
 
 export type Perk = typeof perks.$inferSelect;
 export type InsertPerk = z.infer<typeof insertPerkSchema>;
+
+export type OcrDraftPerk = typeof ocrDraftPerks.$inferSelect;
+export type InsertOcrDraftPerk = z.infer<typeof insertOcrDraftPerkSchema>;
+
+export type OcrImage = typeof ocrImages.$inferSelect;
+export type InsertOcrImage = z.infer<typeof insertOcrImageSchema>;
 
 export type Crowdsourcing = typeof crowdsourcing.$inferSelect;
 export type InsertCrowdsourcing = z.infer<typeof insertCrowdsourcingSchema>;

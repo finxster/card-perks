@@ -4,7 +4,10 @@ import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { randomBytes } from "crypto";
+import multer from "multer";
 import { insertUserSchema, insertCardSchema, insertPerkSchema, insertMerchantSchema, insertHouseholdSchema, insertCrowdsourcingSchema } from "@shared/schema";
+import { ocrService } from "./ocr-service";
+import { createR2Service } from "./r2-service";
 
 const JWT_SECRET = process.env.JWT_SECRET || "cardperks-secret-key-change-in-production";
 const CLOUDFLARE_EMAIL_WORKER = "https://cardperks-email-proxy-dev.oieusouofinx.workers.dev";
@@ -248,9 +251,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/perks/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const perk = await storage.getPerk(req.params.id);
-      if (!perk || perk.createdBy !== req.userId) {
+      if (!perk) {
         return res.status(404).json({ message: 'Perk not found' });
       }
+
+      // Check if user can edit this perk
+      let canEdit = perk.createdBy === req.userId;
+      
+      // If not the creator, check if user is household owner for household card perks
+      if (!canEdit && perk.cardId) {
+        const card = await storage.getCard(perk.cardId);
+        if (card?.isHousehold) {
+          const household = await storage.getUserHousehold(req.userId!);
+          canEdit = household?.ownerId === req.userId;
+        }
+      }
+
+      if (!canEdit) {
+        return res.status(403).json({ message: 'Not authorized to edit this perk' });
+      }
+
       const perkData = insertPerkSchema.partial().parse(req.body);
       const updated = await storage.updatePerk(req.params.id, perkData);
       res.json(updated);
@@ -262,9 +282,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/perks/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       const perk = await storage.getPerk(req.params.id);
-      if (!perk || perk.createdBy !== req.userId) {
+      if (!perk) {
         return res.status(404).json({ message: 'Perk not found' });
       }
+
+      // Check if user can delete this perk
+      let canDelete = perk.createdBy === req.userId;
+      
+      // If not the creator, check if user is household owner for household card perks
+      if (!canDelete && perk.cardId) {
+        const card = await storage.getCard(perk.cardId);
+        if (card?.isHousehold) {
+          const household = await storage.getUserHousehold(req.userId!);
+          canDelete = household?.ownerId === req.userId;
+        }
+      }
+
+      if (!canDelete) {
+        return res.status(403).json({ message: 'Not authorized to delete this perk' });
+      }
+
       await storage.deletePerk(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -606,6 +643,288 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteMerchant(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Configure multer for image uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+      files: 5 // Maximum 5 files per request
+    },
+    fileFilter: (req, file, cb) => {
+      // Only allow image files
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
+  // Initialize R2 service (only if environment variables are provided)
+  let r2Service: any = null;
+  try {
+    r2Service = createR2Service();
+  } catch (error) {
+    console.warn('R2 service not configured:', error);
+  }
+
+  // OCR Routes
+  app.post('/api/ocr/upload', authMiddleware, upload.array('images', 5), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: 'No images uploaded' });
+      }
+
+      const files = req.files as Express.Multer.File[];
+      const userId = req.userId!;
+      const results = [];
+
+      // Clear any existing draft perks for this user
+      await storage.deleteUserOcrDraftPerks(userId);
+
+      for (const file of files) {
+        try {
+          // Process OCR on the image
+          const ocrResult = await ocrService.processImage(file.buffer);
+          
+          // Upload image to R2 if service is available
+          let imageUrl = '';
+          let cloudflareKey = '';
+          
+          if (r2Service) {
+            const { url, key } = await r2Service.uploadImage(file.buffer, file.mimetype, userId);
+            imageUrl = url;
+            cloudflareKey = key;
+            
+            // Store image record in database
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+            await storage.createOcrImage({
+              userId,
+              filename: file.originalname,
+              url: imageUrl,
+              cloudflareKey,
+              processed: true,
+              expiresAt
+            });
+          }
+
+          // Store extracted perks as drafts
+          for (const perk of ocrResult.perks) {
+            await storage.createOcrDraftPerk({
+              userId,
+              merchant: perk.merchant,
+              description: perk.description,
+              expiration: perk.expiration || null,
+              value: perk.value || null,
+              status: 'inactive',
+              imageUrl,
+              extractedText: ocrResult.text,
+              confirmed: false
+            });
+          }
+
+          results.push({
+            filename: file.originalname,
+            imageUrl,
+            perks: ocrResult.perks,
+            confidence: ocrResult.confidence,
+            extractedText: ocrResult.text
+          });
+
+        } catch (error) {
+          console.error(`Error processing ${file.originalname}:`, error);
+          results.push({
+            filename: file.originalname,
+            error: 'Failed to process image',
+            perks: []
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        results,
+        totalPerksFound: results.reduce((sum, result) => sum + (result.perks?.length || 0), 0)
+      });
+
+    } catch (error: any) {
+      console.error('OCR upload error:', error);
+      res.status(500).json({ message: error.message || 'Failed to process images' });
+    }
+  });
+
+  // Get draft perks for review
+  app.get('/api/ocr/draft', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const draftPerks = await storage.getUserOcrDraftPerks(userId);
+      res.json(draftPerks);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a draft perk
+  app.patch('/api/ocr/draft/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { merchant, description, expiration, value, status } = req.body;
+      
+      // Validate that the perk belongs to the user
+      const drafts = await storage.getUserOcrDraftPerks(req.userId!);
+      const draftPerk = drafts.find(p => p.id === id);
+      
+      if (!draftPerk) {
+        return res.status(404).json({ message: 'Draft perk not found' });
+      }
+
+      const updated = await storage.updateOcrDraftPerk(id, {
+        merchant,
+        description,
+        expiration,
+        value,
+        status
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Confirm selected perks and save them permanently
+  app.post('/api/ocr/confirm', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const { perkIds, cardId } = req.body;
+      
+      if (!perkIds || !Array.isArray(perkIds) || perkIds.length === 0) {
+        return res.status(400).json({ message: 'No perks selected for confirmation' });
+      }
+
+      if (!cardId) {
+        return res.status(400).json({ message: 'Card ID is required for confirming perks' });
+      }
+
+      const userId = req.userId!;
+      
+      // Validate that the card belongs to the user
+      const userCards = await storage.getUserCards(userId);
+      const cardExists = userCards.some(card => card.id === cardId);
+      
+      if (!cardExists) {
+        return res.status(400).json({ message: 'Invalid card ID or card does not belong to user' });
+      }
+
+      const draftPerks = await storage.getUserOcrDraftPerks(userId);
+      const confirmedPerks = [];
+
+      for (const perkId of perkIds) {
+        const draftPerk = draftPerks.find(p => p.id === perkId);
+        if (!draftPerk) continue;
+
+        // Create or find merchant
+        let merchant = await storage.searchMerchants(draftPerk.merchant);
+        if (merchant.length === 0) {
+          // Create new merchant
+          merchant = [await storage.createMerchant({
+            name: draftPerk.merchant,
+            category: 'General', // Default category
+            address: null
+          })];
+        }
+
+        // Create permanent perk
+        const perk = await storage.createPerk({
+          name: draftPerk.merchant,
+          description: draftPerk.description,
+          merchantId: merchant[0].id,
+          expirationDate: draftPerk.expiration ? new Date(draftPerk.expiration) : undefined,
+          isPublic: false,
+          createdBy: userId,
+          cardId: cardId,
+          value: draftPerk.value
+        });
+
+        confirmedPerks.push(perk);
+
+        // Mark draft as confirmed
+        await storage.updateOcrDraftPerk(perkId, { confirmed: true });
+      }
+
+      // Clean up confirmed draft perks
+      for (const perkId of perkIds) {
+        await storage.deleteOcrDraftPerk(perkId);
+      }
+
+      res.json({
+        success: true,
+        confirmedPerks,
+        message: `Successfully confirmed ${confirmedPerks.length} perks`
+      });
+
+    } catch (error: any) {
+      console.error('Confirm perks error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete draft perk
+  app.delete('/api/ocr/draft/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate that the perk belongs to the user
+      const drafts = await storage.getUserOcrDraftPerks(req.userId!);
+      const draftPerk = drafts.find(p => p.id === id);
+      
+      if (!draftPerk) {
+        return res.status(404).json({ message: 'Draft perk not found' });
+      }
+
+      await storage.deleteOcrDraftPerk(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cleanup expired images (can be called by cron job)
+  app.post('/api/ocr/cleanup', authMiddleware, adminMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!r2Service) {
+        return res.status(503).json({ message: 'R2 service not configured' });
+      }
+
+      const expiredImages = await storage.getExpiredOcrImages();
+      const keys = expiredImages.map(img => img.cloudflareKey).filter(Boolean);
+      
+      if (keys.length === 0) {
+        return res.json({ message: 'No expired images to clean up' });
+      }
+
+      const { success, failed } = await r2Service.deleteImages(keys);
+      
+      // Delete records from database for successfully deleted images
+      for (const key of success) {
+        const image = expiredImages.find(img => img.cloudflareKey === key);
+        if (image) {
+          await storage.deleteOcrImage(image.id);
+        }
+      }
+
+      res.json({
+        success: true,
+        deleted: success.length,
+        failed: failed.length,
+        message: `Cleaned up ${success.length} expired images`
+      });
+
+    } catch (error: any) {
+      console.error('Cleanup error:', error);
       res.status(500).json({ message: error.message });
     }
   });
