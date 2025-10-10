@@ -32,7 +32,531 @@ export interface OCRResult {
   confidence: number;
 }
 
+export type CardType = 'chase' | 'amex' | 'citi' | 'capital_one' | 'discover' | 'unknown';
+
+export interface CardTypeConfig {
+  name: string;
+  identifiers: string[];
+  merchantPatterns: {
+    merchants: { [key: string]: string[] };
+    ocrCorrections: { [key: string]: string };
+    navigationElements: string[];
+    offerKeywords: string[];
+  };
+  layoutPatterns: {
+    merchantLinePatterns: RegExp[];
+    offerLinePatterns: RegExp[];
+    multiMerchantIndicators: string[];
+    skipPatterns: RegExp[];
+  };
+}
+
 export class OCRService {
+  // Card-specific configurations for precise parsing
+  private readonly cardConfigs: { [key in CardType]: CardTypeConfig } = {
+    chase: {
+      name: 'Chase',
+      identifiers: ['chase offers', 'chase', 'sapphire', 'freedom'],
+      merchantPatterns: {
+        merchants: {
+          'fuboTV': ['fubo', 'fubotv', 'fubo tv'],
+          'Event Tickets Center': ['event tickets', 'event tickets ce', 'event tickets center', 'event'],
+          'Turo': ['turo'],
+          'Dyson': ['dyson'],
+          'Arlo': ['arlo', 'ario', 'arlo™'],
+          'Lands\' End': ['lands end', 'lands\' end', 'lands'],
+          'Zenni Optical': ['zenni optical', 'zenni 0ptical', 'zenni'],
+          'Cole Haan': ['cole haan', 'cole'],
+          'Wild Alaskan Company': ['wild alaskan', 'wild'],
+        },
+        ocrCorrections: {
+          '0': 'o',
+          '1': 'i', 
+          '5': 's',
+          'rn': 'm',
+          'cl': 'd'
+        },
+        navigationElements: [
+          'chase offers', 'all offers', 'shopping', 'groceries', 'home & pet',
+          'gear up for game day', 'new', 'left', 'expires', 'all'
+        ],
+        offerKeywords: [
+          'cash', 'back', 'earn', 'spend', 'get', 'offer', 'offers', 'new',
+          'left', 'days', 'expires', 'credit', 'points', 'miles', 'bonus'
+        ]
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [
+          /^[a-zA-Z][a-zA-Z\s'&.-]{2,30}$/,
+          /^[a-zA-Z][a-zA-Z\s'&.-]*(?:\s+[A-Z][a-z]*)*$/
+        ],
+        offerLinePatterns: [
+          /\d+%\s*cash\s*back/i,
+          /\$\d+\s*cash\s*back/i,
+          /\d+d\s*left/i
+        ],
+        multiMerchantIndicators: ['...', '  ', '\t'],
+        skipPatterns: [
+          /^\d{1,2}:\d{2}/,  // Time stamps
+          /^new$/i,
+          /^all$/i,
+          /\d+d\s*left/i,
+          /^[<>@$#]+$/
+        ]
+      }
+    },
+    amex: {
+      name: 'American Express',
+      identifiers: ['american express', 'amex', 'membership rewards', 'platinum', 'gold'],
+      merchantPatterns: {
+        merchants: {
+          'Amazon': ['amazon', 'amazon.com'],
+          'Best Buy': ['best buy', 'bestbuy'],
+          'Target': ['target'],
+          'Whole Foods': ['whole foods', 'wholefoods'],
+          'Starbucks': ['starbucks'],
+        },
+        ocrCorrections: {
+          'arnzon': 'amazon',
+          'targot': 'target',
+        },
+        navigationElements: [
+          'offers', 'membership rewards', 'earn', 'spend', 'points',
+          'expires', 'terms apply', 'enrollment required'
+        ],
+        offerKeywords: [
+          'points', 'earn', 'spend', 'get', 'offer', 'expires', 'enrollment',
+          'membership', 'rewards', 'terms', 'apply'
+        ]
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [
+          /^[A-Z][a-zA-Z\s&.'-]{3,50}$/,
+        ],
+        offerLinePatterns: [
+          /\d+x\s*points/i,
+          /\d+\s*points/i,
+          /\$\d+\s*back/i,
+          /\d+%\s*back/i
+        ],
+        multiMerchantIndicators: [],
+        skipPatterns: [
+          /^offers$/i,
+          /^earn$/i,
+          /^spend$/i,
+          /terms\s*apply/i,
+          /enrollment\s*required/i
+        ]
+      }
+    },
+    citi: {
+      name: 'Citi',
+      identifiers: ['citi', 'citibank', 'thank you', 'prestige', 'premier'],
+      merchantPatterns: {
+        merchants: {},
+        ocrCorrections: {},
+        navigationElements: ['citi', 'thank you', 'points', 'offers'],
+        offerKeywords: ['points', 'thank', 'you', 'earn', 'spend']
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [/^[A-Z][a-zA-Z\s&.'-]{3,50}$/],
+        offerLinePatterns: [/\d+\s*points/i, /\d+%\s*back/i],
+        multiMerchantIndicators: [],
+        skipPatterns: [/^offers$/i, /^citi$/i]
+      }
+    },
+    capital_one: {
+      name: 'Capital One',
+      identifiers: ['capital one', 'venture', 'quicksilver', 'savor'],
+      merchantPatterns: {
+        merchants: {},
+        ocrCorrections: {},
+        navigationElements: ['capital one', 'venture', 'miles', 'cash back'],
+        offerKeywords: ['miles', 'cash', 'back', 'earn', 'spend']
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [/^[A-Z][a-zA-Z\s&.'-]{3,50}$/],
+        offerLinePatterns: [/\d+\s*miles/i, /\d+%\s*cash/i],
+        multiMerchantIndicators: [],
+        skipPatterns: [/^capital\s*one$/i, /^venture$/i]
+      }
+    },
+    discover: {
+      name: 'Discover',
+      identifiers: ['discover', 'cashback', 'it card'],
+      merchantPatterns: {
+        merchants: {},
+        ocrCorrections: {},
+        navigationElements: ['discover', 'cashback', 'rotating categories'],
+        offerKeywords: ['cashback', 'cash', 'back', 'categories']
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [/^[A-Z][a-zA-Z\s&.'-]{3,50}$/],
+        offerLinePatterns: [/\d+%\s*cash/i],
+        multiMerchantIndicators: [],
+        skipPatterns: [/^discover$/i, /^cashback$/i]
+      }
+    },
+    unknown: {
+      name: 'Unknown',
+      identifiers: [],
+      merchantPatterns: {
+        merchants: {},
+        ocrCorrections: {},
+        navigationElements: [],
+        offerKeywords: ['cash', 'back', 'points', 'miles', 'earn', 'spend']
+      },
+      layoutPatterns: {
+        merchantLinePatterns: [/^[A-Z][a-zA-Z\s&.'-]{3,50}$/],
+        offerLinePatterns: [/\d+%/i, /\$\d+/i, /\d+\s*points/i],
+        multiMerchantIndicators: [],
+        skipPatterns: []
+      }
+    }
+  };
+
+  // Legacy merchant patterns for backward compatibility
+  private readonly merchantPatterns = {
+    // Known merchant names with common OCR variations
+    merchants: {
+      'fuboTV': ['fubo', 'fubotv', 'fubo tv'],
+      'Event Tickets Center': ['event tickets', 'event tickets ce', 'event tickets center', 'event'],
+      'Turo': ['turo'],
+      'Dyson': ['dyson'],
+      'Arlo': ['arlo', 'ario', 'arlo™'],
+      'Lands\' End': ['lands end', 'lands\' end', 'lands'],
+      'Zenni Optical': ['zenni optical', 'zenni 0ptical', 'zenni'],
+      'Cole Haan': ['cole haan', 'cole'],
+      'Wild Alaskan Company': ['wild alaskan', 'wild'],
+    },
+    
+    // Multi-merchant line patterns
+    multiMerchantLines: [
+      {
+        pattern: /fubo.*event.*tickets.*turo/i,
+        merchants: ['fuboTV', 'Event Tickets Center', 'Turo']
+      },
+      {
+        pattern: /dyson.*arlo/i,
+        merchants: ['Dyson', 'Arlo']
+      },
+      {
+        pattern: /lands.*end.*zenni/i,
+        merchants: ['Lands\' End', 'Zenni Optical']
+      }
+    ],
+    
+    // OCR correction patterns
+    ocrCorrections: {
+      '0': 'o',
+      '1': 'i', 
+      '5': 's',
+      'rn': 'm',
+      'cl': 'd'
+    }
+  };
+
+  /**
+   * NEW: Card-type-aware OCR extraction
+   */
+  async extractPerksFromImageWithCardType(imageBuffer: Buffer, cardType: CardType): Promise<OCRResult> {
+    console.log(`Starting OCR extraction for card type: ${cardType}`);
+    
+    try {
+      const result = await Tesseract.recognize(imageBuffer, 'eng', {
+        logger: m => console.log(m)
+      });
+      
+      const text = result.data.text;
+      console.log('OCR Text extracted:', text);
+      
+      // Use card-specific parsing
+      const perks = this.extractPerksFromTextWithCardType(text, cardType);
+      
+      return {
+        text,
+        perks,
+        confidence: result.data.confidence / 100
+      };
+    } catch (error) {
+      console.error('OCR extraction failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Card-type-aware text parsing
+   */
+  extractPerksFromTextWithCardType(text: string, cardType: CardType): ExtractedPerk[] {
+    console.log(`Starting perk parsing from text for card type: ${cardType}...`);
+    
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    console.log(`Processing ${lines.length} lines`);
+    
+    // Auto-detect card type if unknown
+    if (cardType === 'unknown') {
+      cardType = this.detectCardType(text);
+      console.log(`Auto-detected card type: ${cardType}`);
+    }
+    
+    const config = this.cardConfigs[cardType];
+    console.log(`Using ${config.name} parsing configuration`);
+    
+    // Use card-specific parsing strategy
+    return this.parseWithCardConfig(lines, config, cardType);
+  }
+
+  /**
+   * Detect card type from OCR text
+   */
+  private detectCardType(text: string): CardType {
+    const lowerText = text.toLowerCase();
+    
+    for (const [cardType, config] of Object.entries(this.cardConfigs)) {
+      if (cardType === 'unknown') continue;
+      
+      for (const identifier of config.identifiers) {
+        if (lowerText.includes(identifier.toLowerCase())) {
+          return cardType as CardType;
+        }
+      }
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * Parse text using card-specific configuration
+   */
+  private parseWithCardConfig(lines: string[], config: CardTypeConfig, cardType: CardType): ExtractedPerk[] {
+    console.log(`Parsing with ${config.name} configuration...`);
+    
+    const perks: ExtractedPerk[] = [];
+    const processedMerchants = new Set<string>();
+    
+    // Card-specific parsing strategies
+    switch (cardType) {
+      case 'chase':
+        return this.parseChaseFormat(lines, config);
+      case 'amex':
+        return this.parseAmexFormat(lines, config);
+      case 'citi':
+        return this.parseCitiFormat(lines, config);
+      case 'capital_one':
+        return this.parseCapitalOneFormat(lines, config);
+      case 'discover':
+        return this.parseDiscoverFormat(lines, config);
+      default:
+        return this.parseGenericFormat(lines, config);
+    }
+  }
+
+  /**
+   * Chase-specific parsing (uses existing enhanced logic)
+   */
+  private parseChaseFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    // Use the existing Chase Offers parsing logic but with config
+    return this.parseChaseOffersScreen(lines);
+  }
+
+  /**
+   * American Express-specific parsing
+   */
+  private parseAmexFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    const perks: ExtractedPerk[] = [];
+    let currentMerchant = '';
+    let currentOffer = '';
+    let currentExpiration = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Skip pure navigation elements (not offer descriptions)
+      if (this.isAmexNavigationElement(line, config)) {
+        continue;
+      }
+      
+      // Check if this looks like a merchant name (single word or known brand)
+      if (this.looksLikeAmexMerchant(line)) {
+        // Save previous perk if we have one
+        if (currentMerchant && currentOffer) {
+          perks.push({
+            merchant: currentMerchant,
+            description: currentOffer,
+            value: this.extractOfferValue(currentOffer),
+            expiration: currentExpiration || undefined,
+            confidence: 0.9
+          });
+        }
+        // Start new merchant
+        currentMerchant = line;
+        currentOffer = '';
+        currentExpiration = '';
+      } else if (this.matchesAmexOfferPattern(line, config) || this.looksLikeOfferDescription(line)) {
+        // This looks like an offer description
+        if (currentOffer) {
+          currentOffer += ' ' + line;
+        } else {
+          currentOffer = line;
+        }
+      } else if (this.isExpirationLine(line)) {
+        currentExpiration = this.extractExpiration(line);
+      }
+    }
+    
+    // Don't forget the last perk
+    if (currentMerchant && currentOffer) {
+      perks.push({
+        merchant: currentMerchant,
+        description: currentOffer,
+        value: this.extractOfferValue(currentOffer),
+        expiration: currentExpiration || undefined,
+        confidence: 0.9
+      });
+    }
+    
+    return perks;
+  }
+
+  /**
+   * Check if line is a navigation element for AMEX (more restrictive)
+   */
+  private isAmexNavigationElement(line: string, config: CardTypeConfig): boolean {
+    const lowerLine = line.toLowerCase().trim();
+    
+    // Only these are truly navigation elements for AMEX
+    const pureNavigationElements = [
+      'american express', 'membership rewards', 'offers', 'terms apply', 
+      'enrollment required', 'limited time offer'
+    ];
+    
+    return pureNavigationElements.some(element => 
+      lowerLine.includes(element.toLowerCase())
+    );
+  }
+
+  /**
+   * Check if line looks like an offer description
+   */
+  private looksLikeOfferDescription(line: string): boolean {
+    // Look for patterns that indicate offer descriptions
+    const offerPatterns = [
+      /earn\s+\d+/i,           // "Earn 5x points"
+      /spend\s+\$\d+/i,        // "Spend $250"
+      /get\s+\d+/i,            // "Get 10x points"
+      /\d+x\s+points/i,        // "5x points"
+      /\d+\s+points/i,         // "2,500 points"
+      /\$\d+/i,                // "$250"
+      /\d+%/i                  // "20%"
+    ];
+    
+    return offerPatterns.some(pattern => pattern.test(line));
+  }
+
+  /**
+   * Check if line looks like an AMEX merchant
+   */
+  private looksLikeAmexMerchant(line: string): boolean {
+    // AMEX merchants are typically single words or well-known brands
+    const trimmed = line.trim();
+    
+    // Skip if too short or contains obvious offer keywords
+    if (trimmed.length < 3 || this.containsOfferKeywords(trimmed)) {
+      return false;
+    }
+    
+    // Check if it's a single capitalized word or known brand pattern
+    const merchantPatterns = [
+      /^[A-Z][a-z]+$/,           // "Amazon", "Target"
+      /^[A-Z][a-z]+\s+[A-Z][a-z]+$/, // "Best Buy", "American Express"
+      /^[A-Z][a-z]+\s+[A-Z][a-z]+\s+[A-Z][a-z]+$/ // "American Express Card"
+    ];
+    
+    return merchantPatterns.some(pattern => pattern.test(trimmed));
+  }
+
+  /**
+   * Check if line contains expiration information
+   */
+  private isExpirationLine(line: string): boolean {
+    return /expires|valid|until|through/i.test(line) && /\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{4}/i.test(line);
+  }
+
+  /**
+   * Extract expiration date from line
+   */
+  private extractExpiration(line: string): string {
+    const match = line.match(/(\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{4})/);
+    return match ? match[1] : '';
+  }
+
+  /**
+   * Generic format parsing for other card types
+   */
+  private parseGenericFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    // Fallback to existing logic
+    return this.parsePerksFromText(lines.join('\n'));
+  }
+
+  /**
+   * Citi-specific parsing (placeholder)
+   */
+  private parseCitiFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    return this.parseGenericFormat(lines, config);
+  }
+
+  /**
+   * Capital One-specific parsing (placeholder)
+   */
+  private parseCapitalOneFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    return this.parseGenericFormat(lines, config);
+  }
+
+  /**
+   * Discover-specific parsing (placeholder)
+   */
+  private parseDiscoverFormat(lines: string[], config: CardTypeConfig): ExtractedPerk[] {
+    return this.parseGenericFormat(lines, config);
+  }
+
+  /**
+   * Check if line matches AMEX merchant pattern
+   */
+  private matchesAmexMerchantPattern(line: string, config: CardTypeConfig): boolean {
+    return config.layoutPatterns.merchantLinePatterns.some(pattern => pattern.test(line)) &&
+           !this.containsOfferKeywords(line);
+  }
+
+  /**
+   * Check if line matches AMEX offer pattern
+   */
+  private matchesAmexOfferPattern(line: string, config: CardTypeConfig): boolean {
+    return config.layoutPatterns.offerLinePatterns.some(pattern => pattern.test(line));
+  }
+
+  /**
+   * Check if line is a navigation element using config
+   */
+  private isNavigationElement(line: string, config: CardTypeConfig): boolean {
+    const lowerLine = line.toLowerCase();
+    return config.merchantPatterns.navigationElements.some(element => 
+      lowerLine.includes(element.toLowerCase())
+    );
+  }
+
+  /**
+   * Extract offer value from text
+   */
+  private extractOfferValue(text: string): string {
+    const pointsMatch = text.match(/(\d+[x]?\s*points?)/i);
+    const percentMatch = text.match(/(\d+%)/);
+    const dollarMatch = text.match(/(\$\d+)/);
+    
+    return pointsMatch?.[1] || percentMatch?.[1] || dollarMatch?.[1] || 'N/A';
+  }
+
+  // ===== LEGACY METHODS (for backward compatibility) =====
+
   /**
    * Extract text from image using Tesseract OCR
    */
@@ -245,34 +769,9 @@ export class OCRService {
   }
 
   /**
-   * Extract merchant name from Chase Offers format
+   * Extract merchant name using configurable patterns
    */
   private extractChaseOfferMerchant(line: string): string | null {
-    // Common merchants in Chase Offers with potential OCR variations
-    const merchantMap: { [key: string]: string } = {
-      'fubo': 'fuboTV',
-      'fubotv': 'fuboTV',
-      'fubo tv': 'fuboTV',
-      'event tickets': 'Event Tickets Center',
-      'event tickets ce': 'Event Tickets Center',
-      'event tickets center': 'Event Tickets Center',
-      'event': 'Event Tickets Center', // Partial match for OCR errors
-      'turo': 'Turo',
-      'dyson': 'Dyson',
-      'arlo': 'Arlo',
-      'ario': 'Arlo', // Common OCR error: I mistaken for l
-      'arIo': 'Arlo', // Case variation
-      'lands end': 'Lands\' End',
-      'lands': 'Lands\' End', // Partial match
-      'zenni optical': 'Zenni Optical',
-      'zenni': 'Zenni Optical',
-      'zenni 0ptical': 'Zenni Optical', // OCR error: 0 for O
-      'cole haan': 'Cole Haan',
-      'cole': 'Cole Haan', // Partial match
-      'wild alaskan': 'Wild Alaskan Company',
-      'wild': 'Wild Alaskan Company' // Partial match
-    };
-    
     const cleanLine = line.toLowerCase().trim();
     
     // Skip obvious non-merchant patterns
@@ -280,31 +779,162 @@ export class OCRService {
       return null;
     }
     
-    // Direct mapping
-    if (merchantMap[cleanLine]) {
-      return merchantMap[cleanLine];
+    // Check against known merchant patterns
+    for (const [merchantName, patterns] of Object.entries(this.merchantPatterns.merchants)) {
+      for (const pattern of patterns) {
+        if (cleanLine.includes(pattern) || this.fuzzyMatch(cleanLine, pattern)) {
+          return merchantName;
+        }
+      }
     }
     
-    // Partial matching for truncated names and OCR errors
-    for (const [key, value] of Object.entries(merchantMap)) {
-      // Check if line contains the key or key contains the line (for partial matches)
-      if (cleanLine.includes(key) || key.includes(cleanLine)) {
-        return value;
-      }
+    // Fallback: intelligent detection for unknown merchants
+    return this.detectUnknownMerchant(line);
+  }
+
+  /**
+   * Simple fuzzy matching for OCR errors
+   */
+  private fuzzyMatch(text: string, pattern: string): boolean {
+    // Apply OCR corrections and check again
+    let correctedText = text;
+    for (const [error, correction] of Object.entries(this.merchantPatterns.ocrCorrections)) {
+      correctedText = correctedText.replace(new RegExp(error, 'gi'), correction);
+    }
+    
+    return correctedText.includes(pattern) || 
+           pattern.includes(correctedText) ||
+           this.calculateSimilarity(correctedText, pattern) > 0.8;
+  }
+
+  /**
+   * Calculate similarity between two strings
+   */
+  private calculateSimilarity(str1: string, str2: string): number {
+    if (Math.abs(str1.length - str2.length) > 2) return 0;
+    
+    let matches = 0;
+    const minLength = Math.min(str1.length, str2.length);
+    
+    for (let i = 0; i < minLength; i++) {
+      if (str1[i] === str2[i]) matches++;
+    }
+    
+    return matches / minLength;
+  }
+
+  /**
+   * Detect unknown merchants using basic patterns
+   */
+  private detectUnknownMerchant(line: string): string | null {
+    const trimmed = line.trim();
+    
+    // Basic merchant name patterns
+    if (trimmed.length >= 3 && 
+        trimmed.length <= 30 && 
+        /^[a-zA-Z][a-zA-Z\s'-]*[a-zA-Z]$/.test(trimmed) &&
+        !this.containsOfferKeywords(line)) {
       
-      // Fuzzy matching for OCR errors (simple Levenshtein-like check)
-      if (this.isFuzzyMatch(cleanLine, key)) {
-        return value;
-      }
-    }
-    
-    // Look for merchant-like patterns (capitalized words, not too long)
-    if (this.looksLikeMerchantName(line) && line.length < 30) {
-      return this.cleanMerchantName(line);
+      return this.cleanMerchantName(trimmed);
     }
     
     return null;
   }
+
+
+
+  /**
+   * Pattern-based intelligent merchant detection 
+   */
+  private detectMerchantIntelligently(text: string): string | null {
+    const cleanText = text.toLowerCase().trim();
+    
+    // Skip if too short or contains too many numbers/symbols
+    if (cleanText.length < 3 || /[\d%$]{2,}/.test(cleanText)) return null;
+    
+    // Check against known merchant patterns first
+    for (const [merchantName, patterns] of Object.entries(this.merchantPatterns.merchants)) {
+      for (const pattern of patterns) {
+        if (cleanText.includes(pattern) || this.fuzzyMatch(cleanText, pattern)) {
+          return merchantName;
+        }
+      }
+    }
+    
+    // Apply OCR corrections and try again
+    let correctedText = cleanText;
+    for (const [error, correction] of Object.entries(this.merchantPatterns.ocrCorrections)) {
+      correctedText = correctedText.replace(new RegExp(error, 'gi'), correction);
+    }
+    
+    // Try patterns again with corrected text
+    for (const [merchantName, patterns] of Object.entries(this.merchantPatterns.merchants)) {
+      for (const pattern of patterns) {
+        if (correctedText.includes(pattern)) {
+          return merchantName;
+        }
+      }
+    }
+    
+    // Fallback: basic merchant detection
+    return this.detectUnknownMerchant(text);
+  }
+
+  /**
+   * Check if a word is an offer-related keyword
+   */
+  private isOfferKeyword(word: string): boolean {
+    return this.containsOfferKeywords(word);
+  }
+
+  /**
+   * Check if a word is a common English word that's unlikely to be a merchant name
+   */
+  private isCommonWord(word: string): boolean {
+    const commonWords = new Set([
+      'the', 'and', 'or', 'but', 'for', 'with', 'on', 'at', 'in', 'to', 'of',
+      'up', 'get', 'all', 'you', 'can', 'see', 'now', 'out', 'day', 'way'
+    ]);
+    return commonWords.has(word.toLowerCase());
+  }
+
+  /**
+   * Enhanced merchant name detection with better filtering
+   */
+  private looksLikeMerchantName(line: string): boolean {
+    const trimmedLine = line.trim();
+    
+    // Must be reasonable length
+    if (trimmedLine.length < 2 || trimmedLine.length > 30) return false;
+    
+    // Skip obvious non-merchant patterns
+    if (/^\d+[%$]|^[\d\s%$]+$|back|cash|left|expires/i.test(trimmedLine)) return false;
+    
+    // Skip single letters or very short words unless they're known brands
+    if (trimmedLine.length < 3 && !this.isKnownShortBrand(trimmedLine)) return false;
+    
+    // Check for merchant-like patterns
+    const merchantPatterns = [
+      /^[A-Z][a-z]+(?:\s+[A-Z&+'][a-z]*)*$/,  // "Nordstrom", "Shake Shack", "Walmart+"
+      /^[a-z]+(?:\s+[a-z]+)*$/i,              // Lowercase merchants like "fuboTV", "turo"
+    ];
+    
+    // Check if it matches merchant patterns and doesn't contain too many offer keywords
+    const isPatternMatch = merchantPatterns.some(pattern => pattern.test(trimmedLine));
+    const offerKeywordCount = trimmedLine.split(/\s+/).filter(word => this.isOfferKeyword(word)).length;
+    
+    return isPatternMatch && offerKeywordCount <= 1; // Allow max 1 offer keyword
+  }
+
+  /**
+   * Check if a short string is a known brand name
+   */
+  private isKnownShortBrand(text: string): boolean {
+    const knownShorts = ['hp', 'ge', 'lg', 'tv', 'pc', 'bp'];
+    return knownShorts.includes(text.toLowerCase());
+  }
+
+
 
   /**
    * Simple fuzzy matching for OCR errors
@@ -330,49 +960,211 @@ export class OCRService {
   }
 
   /**
-   * Extract multiple merchant names from a single line (handles combined merchant lines)
+   * Extract multiple merchants using configurable patterns
    */
   private extractMultipleChaseOfferMerchants(line: string): string[] {
-    const merchants: string[] = [];
-    
-    // Check for known multi-merchant patterns first
-    const multiMerchantPatterns = [
-      // "fuboTV Event Tickets Ce... Turo" - this is the main problematic line
-      {
-        pattern: /(fubo\w*)\s+(event\s+tickets[^.]*)\s+(turo)/i,
-        merchants: ['fuboTV', 'Event Tickets Center', 'Turo']
-      },
-      // Also handle variations of the above line
-      {
-        pattern: /(fubo\w*)\s.*(event\s+tickets[^.]*)\s.*(turo)/i,
-        merchants: ['fuboTV', 'Event Tickets Center', 'Turo']
-      },
-      // "Dyson Arlo" 
-      {
-        pattern: /(dyson)\s+(arlo\w*)/i,
-        merchants: ['Dyson', 'Arlo']
-      },
-      // "Lands' End Zenni Optical"
-      {
-        pattern: /(lands['\s]*end)\s+(zenni\s*\w*)/i,
-        merchants: ['Lands\' End', 'Zenni Optical']
-      }
-    ];
-    
-    for (const { pattern, merchants: patternMerchants } of multiMerchantPatterns) {
-      if (pattern.test(line)) {
-        console.log(`Found multi-merchant pattern in line: "${line}" -> ${patternMerchants.join(', ')}`);
-        return patternMerchants; // Replace single merchant with all merchants from pattern
+    // Check multi-merchant patterns first
+    for (const pattern of this.merchantPatterns.multiMerchantLines) {
+      if (pattern.pattern.test(line)) {
+        console.log(`Found multi-merchant pattern in line: "${line}" -> ${pattern.merchants.join(', ')}`);
+        return pattern.merchants;
       }
     }
     
-    // If no multi-merchant pattern matches, try single merchant extraction
+    // If no pattern matches, try intelligent splitting
+    return this.splitMerchantsIntelligently(line);
+  }
+
+  /**
+   * Intelligently split a line that might contain multiple merchants
+   */
+  private splitMerchantsIntelligently(line: string): string[] {
+    const merchants: string[] = [];
+    
+    // Try single merchant first
     const singleMerchant = this.extractChaseOfferMerchant(line);
     if (singleMerchant) {
-      merchants.push(singleMerchant);
+      // Check if line contains more than just this merchant
+      if (this.lineContainsMultipleMerchants(line, singleMerchant)) {
+        // Try to extract others
+        const otherMerchants = this.extractOtherMerchants(line, singleMerchant);
+        merchants.push(singleMerchant, ...otherMerchants);
+      } else {
+        merchants.push(singleMerchant);
+      }
     }
     
     return merchants;
+  }
+
+  /**
+   * Check if line contains multiple merchants beyond the detected one
+   */
+  private lineContainsMultipleMerchants(line: string, detectedMerchant: string): boolean {
+    // Remove the detected merchant and see if there are other merchant-like words
+    const withoutDetected = line.replace(new RegExp(detectedMerchant, 'gi'), '');
+    const remainingWords = withoutDetected.split(/\s+/).filter(word => 
+      word.length > 2 && 
+      /^[A-Za-z]/.test(word) && 
+      !this.isOfferKeyword(word)
+    );
+    
+    return remainingWords.length >= 2; // At least 2 more words that could form another merchant
+  }
+
+  /**
+   * Extract other merchants from line after removing the first detected one
+   */
+  private extractOtherMerchants(line: string, firstMerchant: string): string[] {
+    const merchants: string[] = [];
+    
+    // Remove first merchant and try to extract others
+    const remaining = line.replace(new RegExp(firstMerchant, 'gi'), ' ').trim();
+    
+    // Split by spaces and group into potential merchant names
+    const words = remaining.split(/\s+/).filter(word => 
+      word.length > 1 && 
+      !/^\d/.test(word) && 
+      !this.isOfferKeyword(word)
+    );
+    
+    // Try to form merchant names from remaining words
+    let currentMerchant = '';
+    for (const word of words) {
+      if (currentMerchant && this.couldBeNewMerchantStart(word)) {
+        const merchant = this.extractChaseOfferMerchant(currentMerchant);
+        if (merchant && merchant !== firstMerchant) {
+          merchants.push(merchant);
+        }
+        currentMerchant = word;
+      } else {
+        currentMerchant += (currentMerchant ? ' ' : '') + word;
+      }
+    }
+    
+    // Check last merchant
+    if (currentMerchant) {
+      const merchant = this.extractChaseOfferMerchant(currentMerchant);
+      if (merchant && merchant !== firstMerchant) {
+        merchants.push(merchant);
+      }
+    }
+    
+    return merchants;
+  }
+
+  /**
+   * Check if word could start a new merchant name
+   */
+  private couldBeNewMerchantStart(word: string): boolean {
+    return /^[A-Z]/.test(word) && word.length > 2;
+  }
+
+  /**
+   * Check if a line is likely to contain multiple merchants
+   */
+  private isLikelyMultiMerchantLine(line: string): boolean {
+    // Count potential merchant words (capitalized words that aren't common)
+    const words = line.split(/\s+/);
+    const merchantLikeWords = words.filter(word => 
+      word.length > 2 && 
+      /^[A-Z]/.test(word) && 
+      !this.isOfferKeyword(word) &&
+      !this.isCommonWord(word)
+    );
+    
+    return merchantLikeWords.length >= 2;
+  }
+
+  /**
+   * Extract merchants from a line known to contain multiple merchants
+   */
+  private extractMerchantsFromMultiMerchantLine(line: string): string[] {
+    const merchants: string[] = [];
+    
+    // Split by common patterns that separate merchants
+    const segments = line.split(/\s{2,}|\s+(?=[A-Z][a-z]+\s[A-Z])/);
+    
+    for (const segment of segments) {
+      const merchant = this.detectMerchantIntelligently(segment.trim());
+      if (merchant && !merchants.includes(merchant)) {
+        merchants.push(merchant);
+      }
+    }
+    
+    // If we didn't find multiple merchants, try a different approach
+    if (merchants.length <= 1) {
+      return this.extractMerchantsUsingWordAnalysis(line);
+    }
+    
+    return merchants;
+  }
+
+  /**
+   * Extract merchants by analyzing individual words
+   */
+  private extractMerchantsUsingWordAnalysis(line: string): string[] {
+    const merchants: string[] = [];
+    const words = line.split(/\s+/);
+    let currentMerchant: string[] = [];
+    
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      
+      // Skip obvious non-merchant words
+      if (this.isOfferKeyword(word) || /^\d/.test(word) || word.length < 2) {
+        if (currentMerchant.length > 0) {
+          const merchantName = this.validateAndFormatMerchant(currentMerchant.join(' '));
+          if (merchantName) merchants.push(merchantName);
+          currentMerchant = [];
+        }
+        continue;
+      }
+      
+      // Check if this word could start a new merchant
+      if (this.couldBeStartOfNewMerchant(word, currentMerchant)) {
+        if (currentMerchant.length > 0) {
+          const merchantName = this.validateAndFormatMerchant(currentMerchant.join(' '));
+          if (merchantName) merchants.push(merchantName);
+        }
+        currentMerchant = [word];
+      } else {
+        currentMerchant.push(word);
+      }
+    }
+    
+    // Handle last merchant
+    if (currentMerchant.length > 0) {
+      const merchantName = this.validateAndFormatMerchant(currentMerchant.join(' '));
+      if (merchantName) merchants.push(merchantName);
+    }
+    
+    return merchants;
+  }
+
+  /**
+   * Check if a word could be the start of a new merchant name
+   */
+  private couldBeStartOfNewMerchant(word: string, currentMerchant: string[]): boolean {
+    // If we don't have a current merchant, this is definitely a start
+    if (currentMerchant.length === 0) return true;
+    
+    // If current merchant is already 2+ words and this is capitalized, likely new merchant
+    if (currentMerchant.length >= 2 && /^[A-Z]/.test(word)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Validate and format a potential merchant name
+   */
+  private validateAndFormatMerchant(merchantText: string): string | null {
+    if (!merchantText || merchantText.trim().length < 3) return null;
+    
+    const formatted = this.detectMerchantIntelligently(merchantText);
+    return formatted && formatted.length >= 3 ? formatted : null;
   }
 
   /**
@@ -387,28 +1179,85 @@ export class OCRService {
    * Extract the appropriate offer for a specific merchant from a multi-offer line
    */
   private extractOfferForMerchant(line: string, merchant: string): string | null {
-    // Map merchants to their expected offer positions
-    const merchantOfferMap: { [key: string]: number } = {
-      'fuboTV': 0,           // First offer: 35% cash back
-      'Event Tickets Center': 1, // Second offer: 10% cash back  
-      'Turo': 2,             // Third offer: $30 cash back
-      'Dyson': 0,            // First offer when with Arlo: 5% cash back
-      'Arlo': 1,             // Second offer when with Dyson: 15% cash back
-      'Lands\' End': 0,      // First offer when with Zenni: 5% cash back
-      'Zenni Optical': 1     // Second offer when with Lands' End: 10% cash back
-    };
-    
     const offers = line.match(/(\d+%\s+cash\s+back|\$\d+\s+cash\s+back)/gi);
     if (!offers) return null;
     
-    const offerIndex = merchantOfferMap[merchant];
-    if (offerIndex !== undefined && offers[offerIndex]) {
-      console.log(`  Found offer for ${merchant} at position ${offerIndex}: ${offers[offerIndex]}`);
-      return offers[offerIndex];
+    // Get the position of this merchant in the line
+    const merchantPosition = this.findMerchantPositionInLine(line, merchant);
+    
+    // If we can determine position, use it to map to offer
+    if (merchantPosition >= 0 && offers[merchantPosition]) {
+      console.log(`  Found offer for ${merchant} at position ${merchantPosition}: ${offers[merchantPosition]}`);
+      return offers[merchantPosition];
     }
     
-    // Fallback: return first offer
+    // Fallback: analyze line structure to map merchants to offers
+    const mappedOffer = this.mapMerchantToOfferIntelligently(line, merchant, offers);
+    if (mappedOffer) {
+      console.log(`  Mapped offer for ${merchant}: ${mappedOffer}`);
+      return mappedOffer;
+    }
+    
+    // Last resort: return first offer
     return offers[0];
+  }
+
+  /**
+   * Find the position of a merchant within a line containing multiple merchants
+   */
+  private findMerchantPositionInLine(line: string, merchant: string): number {
+    const detectedMerchants = this.extractMerchantsFromMultiMerchantLine(line);
+    const merchantIndex = detectedMerchants.findIndex((m: string) => 
+      m.toLowerCase() === merchant.toLowerCase()
+    );
+    
+    return merchantIndex >= 0 ? merchantIndex : -1;
+  }
+
+  /**
+   * Intelligently map merchants to offers based on line structure
+   */
+  private mapMerchantToOfferIntelligently(line: string, merchant: string, offers: string[]): string | null {
+    // Split line into segments and try to correlate merchants with offers
+    const words = line.split(/\s+/);
+    
+    // Find where the merchant appears in the word sequence
+    const merchantWords = merchant.toLowerCase().split(/\s+/);
+    let merchantStartIndex = -1;
+    
+    for (let i = 0; i <= words.length - merchantWords.length; i++) {
+      const slice = words.slice(i, i + merchantWords.length).join(' ').toLowerCase();
+      if (slice.includes(merchantWords[0]) || merchantWords[0].includes(slice.split(' ')[0])) {
+        merchantStartIndex = i;
+        break;
+      }
+    }
+    
+    if (merchantStartIndex >= 0) {
+      // Find which offer is closest to this merchant position
+      const offerPositions = offers.map(offer => {
+        const offerIndex = line.toLowerCase().indexOf(offer.toLowerCase());
+        return { offer, index: offerIndex };
+      });
+      
+      const merchantPosition = words.slice(0, merchantStartIndex).join(' ').length;
+      
+      // Find the offer with the closest position
+      let closestOffer = offerPositions[0];
+      let closestDistance = Math.abs(closestOffer.index - merchantPosition);
+      
+      for (const offerPos of offerPositions) {
+        const distance = Math.abs(offerPos.index - merchantPosition);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestOffer = offerPos;
+        }
+      }
+      
+      return closestOffer.offer;
+    }
+    
+    return null;
   }
 
   /**
@@ -484,16 +1333,28 @@ export class OCRService {
    * Parse direct offer patterns from a single line
    */
   private parseDirectChaseOffer(line: string): ExtractedPerk | null {
+    // Skip lines that look like pure offer descriptions without merchant names
+    if (this.isOfferOnlyLine(line)) {
+      return null;
+    }
+    
     // Look for lines that contain both merchant and offer
     const directPatterns = [
-      /([a-z]+(?:\s+[a-z]+)*)\s+(\d+)%\s+cash\s+back/i,
-      /([a-z]+(?:\s+[a-z]+)*)\s+\$(\d+)\s+cash\s+back/i
+      /([a-z][a-z\s']+[a-z])\s+(\d+)%\s+cash\s+back/i,
+      /([a-z][a-z\s']+[a-z])\s+\$(\d+)\s+cash\s+back/i
     ];
     
     for (const pattern of directPatterns) {
       const match = pattern.exec(line);
       if (match) {
-        const merchant = this.cleanMerchantName(match[1]);
+        const merchantText = match[1].trim();
+        
+        // Skip if the merchant text contains offer keywords
+        if (this.containsOfferKeywords(merchantText)) {
+          continue;
+        }
+        
+        const merchant = this.cleanMerchantName(merchantText);
         const value = pattern.source.includes('%') 
           ? `${match[2]}% cash back`
           : `$${match[2]} cash back`;
@@ -508,6 +1369,19 @@ export class OCRService {
     }
     
     return null;
+  }
+
+  /**
+   * Check if a line contains only offer information without merchant names
+   */
+  private isOfferOnlyLine(line: string): boolean {
+    const cleaned = line.toLowerCase().trim();
+    
+    // Lines with multiple cash back amounts are usually pure offer lines
+    const cashBackMatches = (cleaned.match(/\d+%\s*cash\s*back/g) || []).length;
+    const dollarBackMatches = (cleaned.match(/\$\d+\s*cash\s*back/g) || []).length;
+    
+    return (cashBackMatches + dollarBackMatches) >= 2;
   }
 
   /**
@@ -621,42 +1495,6 @@ export class OCRService {
     }
     
     return null;
-  }
-
-  private looksLikeMerchantName(line: string): boolean {
-    // Check for brand name patterns
-    const brandPatterns = [
-      /^[A-Z][a-z]+(?:\s+[A-Z&+][a-z]*)*$/,  // "Nordstrom", "Shake Shack", "Walmart+"
-      /^[A-Z][a-z]+\s*[&+]\s*[A-Z][a-z]+/,   // "Nordstrom & Nordstrom Rack"
-      /^[A-Z][a-z]+\+$/,                      // "Walmart+"
-      /^[A-Z][a-z]+\s+[A-Z][a-z]+$/,         // "Shake Shack", "El Pollo"
-      /^[a-z]+(?:\s+[a-z]+)*$/i,             // Lowercase merchants like "fuboTV", "turo"
-    ];
-    
-    // Chase Offers specific merchant patterns
-    const chasePatterns = [
-      /^(?:fubo|fubotv)$/i,
-      /^event\s+tickets/i,
-      /^turo$/i,
-      /^dyson$/i,
-      /^arlo$/i,
-      /^lands.*end$/i,
-      /^zenni/i,
-      /^cole\s+haan$/i,
-      /^wild\s+alaskan/i
-    ];
-    
-    const trimmedLine = line.trim();
-    
-    // Check Chase-specific patterns first
-    if (chasePatterns.some(pattern => pattern.test(trimmedLine))) {
-      return true;
-    }
-    
-    return brandPatterns.some(pattern => pattern.test(trimmedLine)) && 
-           trimmedLine.length < 50 && // Not too long
-           trimmedLine.length > 2 &&  // Not too short
-           !this.containsOfferKeywords(line); // Doesn't contain offer keywords
   }
 
   private containsOfferKeywords(line: string): boolean {
@@ -1005,7 +1843,22 @@ export class OCRService {
   }
 
   /**
-   * Main method to process an image and extract perks
+   * NEW: Process image with explicit card type for better accuracy
+   */
+  async processImageWithCardType(imageBuffer: Buffer, cardType: CardType): Promise<OCRResult> {
+    console.log(`Processing image with card type: ${cardType}`);
+    const { text, confidence } = await this.extractTextFromImage(imageBuffer);
+    const perks = this.extractPerksFromTextWithCardType(text, cardType);
+    
+    return {
+      text,
+      perks,
+      confidence
+    };
+  }
+
+  /**
+   * Main method to process an image and extract perks (legacy API)
    */
   async processImage(imageBuffer: Buffer): Promise<OCRResult> {
     const { text, confidence } = await this.extractTextFromImage(imageBuffer);

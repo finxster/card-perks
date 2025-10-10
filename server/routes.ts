@@ -681,15 +681,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const files = req.files as Express.Multer.File[];
       const userId = req.userId!;
+      const cardType = req.body.cardType;
+      const cardId = req.body.cardId; // New: selected card ID
       const results = [];
+
+      // Validate required parameters
+      if (!cardType) {
+        return res.status(400).json({ message: 'Card type is required' });
+      }
+
+      console.log(`Processing ${files.length} images for card type: ${cardType}, cardId: ${cardId || 'none'}`);
 
       // Clear any existing draft perks for this user
       await storage.deleteUserOcrDraftPerks(userId);
 
       for (const file of files) {
         try {
-          // Process OCR on the image
-          const ocrResult = await ocrService.processImage(file.buffer);
+          // Process OCR on the image using card type for better accuracy
+          const ocrResult = await ocrService.processImageWithCardType(file.buffer, cardType);
           
           // Upload image to R2 if service is available
           let imageUrl = '';
@@ -716,6 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const perk of ocrResult.perks) {
             await storage.createOcrDraftPerk({
               userId,
+              cardId: cardId || null, // Associate with the selected card
               merchant: perk.merchant,
               description: perk.description,
               expiration: perk.expiration || null,
@@ -732,7 +742,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             imageUrl,
             perks: ocrResult.perks,
             confidence: ocrResult.confidence,
-            extractedText: ocrResult.text
+            extractedText: ocrResult.text,
+            cardType: cardType
           });
 
         } catch (error) {

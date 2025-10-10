@@ -41,8 +41,17 @@ const networks = [
   'Mastercard',
   'American Express',
   'Discover',
+  'Other',
+];
+
+const issuers = [
   'Chase',
+  'American Express',
+  'Citi',
   'Capital One',
+  'Wells Fargo',
+  'Bank of America',
+  'Discover',
   'Other',
 ];
 
@@ -55,6 +64,7 @@ export function AddCardDialog({ onAdd, trigger, isHousehold }: AddCardDialogProp
     defaultValues: {
       name: '',
       network: '',
+      issuer: '',
       lastFourDigits: '',
       isHousehold: isHousehold ?? false,
     },
@@ -129,6 +139,31 @@ export function AddCardDialog({ onAdd, trigger, isHousehold }: AddCardDialogProp
                       {networks.map((network) => (
                         <SelectItem key={network} value={network}>
                           {network}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="issuer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Card Issuer</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-issuer">
+                        <SelectValue placeholder="Select card issuer" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {issuers.map((issuer) => (
+                        <SelectItem key={issuer} value={issuer}>
+                          {issuer}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -36,6 +36,7 @@ export const cards = pgTable("cards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   network: text("network").notNull(), // Visa, Mastercard, Amex, Discover, etc.
+  issuer: text("issuer"), // Chase, Citi, American Express, Capital One, etc. (optional for backward compatibility)
   lastFourDigits: text("last_four_digits"),
   ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   isHousehold: boolean("is_household").notNull().default(false),
@@ -82,6 +83,7 @@ export const crowdsourcing = pgTable("crowdsourcing", {
 export const ocrDraftPerks = pgTable("ocr_draft_perks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  cardId: varchar("card_id").references(() => cards.id, { onDelete: "set null" }), // Associated card
   merchant: text("merchant").notNull(),
   description: text("description").notNull(),
   expiration: text("expiration"),

@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Upload, Image, CheckCircle, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle, Upload, Image, CheckCircle, X, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { Card as CardType } from '@shared/schema';
 
 interface UploadResult {
   filename: string;
@@ -14,15 +17,38 @@ interface UploadResult {
   perks: any[];
   confidence?: number;
   extractedText?: string;
+  cardType?: string;
   error?: string;
+}
+
+// Map card issuer to OCR card type for parsing
+function mapIssuerToCardType(issuer: string | null | undefined): string {
+  if (!issuer) return 'unknown';
+  
+  const issuerLower = issuer.toLowerCase();
+  if (issuerLower.includes('chase')) return 'chase';
+  if (issuerLower.includes('american express') || issuerLower.includes('amex')) return 'amex';
+  if (issuerLower.includes('citi')) return 'citi';
+  if (issuerLower.includes('capital one')) return 'capital_one';
+  if (issuerLower.includes('discover')) return 'discover';
+  if (issuerLower.includes('wells fargo')) return 'wells_fargo';
+  if (issuerLower.includes('bank of america')) return 'bank_of_america';
+  
+  return 'unknown';
 }
 
 export default function OCRUpload() {
   const [files, setFiles] = useState<File[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [results, setResults] = useState<UploadResult[]>([]);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  // Fetch user's cards
+  const { data: cards = [], isLoading: cardsLoading } = useQuery<CardType[]>({
+    queryKey: ['/api/cards'],
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -58,10 +84,29 @@ export default function OCRUpload() {
   };
 
   const handleUpload = async () => {
+    if (!selectedCardId) {
+      toast({
+        title: "Card selection required",
+        description: "Please select which credit card you're uploading offers for",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (files.length === 0) {
       toast({
         title: "No files selected",
         description: "Please select at least one image to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedCard = cards.find(card => card.id === selectedCardId);
+    if (!selectedCard) {
+      toast({
+        title: "Invalid card selection",
+        description: "Selected card not found",
         variant: "destructive",
       });
       return;
@@ -74,6 +119,11 @@ export default function OCRUpload() {
       files.forEach(file => {
         formData.append('images', file);
       });
+      
+      // Add card ID and derive card type from issuer
+      formData.append('cardId', selectedCardId);
+      const cardType = mapIssuerToCardType(selectedCard.issuer);
+      formData.append('cardType', cardType);
 
       const token = localStorage.getItem('token');
       const response = await fetch('/api/ocr/upload', {
@@ -140,6 +190,49 @@ export default function OCRUpload() {
         </p>
       </div>
 
+      {/* Card Selection */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Select Your Credit Card
+          </CardTitle>
+          <CardDescription>
+            Choose which of your credit cards you're uploading offers for. This will automatically use the right parsing strategy and pre-fill the confirmation page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="cardSelect">Your Credit Cards</Label>
+            {cardsLoading ? (
+              <div className="text-sm text-muted-foreground">Loading your cards...</div>
+            ) : cards.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                No cards found. Please add a credit card first in your dashboard.
+              </div>
+            ) : (
+              <Select value={selectedCardId} onValueChange={setSelectedCardId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select one of your credit cards..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cards.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name} {card.lastFourDigits ? `(****${card.lastFourDigits})` : ''} - {card.issuer || 'Unknown Issuer'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {!selectedCardId && cards.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Select your card to enable image upload
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -159,9 +252,19 @@ export default function OCRUpload() {
               multiple
               accept="image/*"
               onChange={handleFileChange}
-              disabled={isUploading}
+              disabled={isUploading || !selectedCardId || cards.length === 0}
               className="mt-1"
             />
+            {!selectedCardId && cards.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Please select a card first
+              </p>
+            )}
+            {cards.length === 0 && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Add a credit card to your account first
+              </p>
+            )}
           </div>
 
           {files.length > 0 && (

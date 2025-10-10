@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CheckCircle, Edit, Trash2, Calendar, DollarSign, Store, FileText } from 'lucide-react';
+import { CheckCircle, Edit, Trash2, Calendar, DollarSign, Store, FileText, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { queryClient } from '@/lib/queryClient';
@@ -25,12 +25,14 @@ interface DraftPerk {
   extractedText?: string;
   confirmed: boolean;
   createdAt: string;
+  cardId?: string; // Associated card from upload
 }
 
 interface Card {
   id: string;
   name: string;
   network: string;
+  issuer?: string;
   lastFourDigits?: string;
 }
 
@@ -46,7 +48,7 @@ export default function OCRConfirm() {
   const [draftPerks, setDraftPerks] = useState<DraftPerk[]>([]);
   const [selectedPerks, setSelectedPerks] = useState<Set<string>>(new Set());
   const [cards, setCards] = useState<Card[]>([]);
-  const [selectedCard, setSelectedCard] = useState<string>('');
+  const [associatedCard, setAssociatedCard] = useState<Card | null>(null); // The card from upload
   const [isLoading, setIsLoading] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
   const [editingPerk, setEditingPerk] = useState<DraftPerk | null>(null);
@@ -62,7 +64,6 @@ export default function OCRConfirm() {
 
   useEffect(() => {
     loadDraftPerks();
-    loadCards();
   }, []);
 
   const loadDraftPerks = async () => {
@@ -83,6 +84,15 @@ export default function OCRConfirm() {
       
       // Pre-select all perks by default
       setSelectedPerks(new Set(perks.map((p: DraftPerk) => p.id)));
+      
+      // Find the associated card from the first perk with a cardId
+      if (perks.length > 0 && perks[0].cardId) {
+        const cardId = perks[0].cardId;
+        // We'll load cards first and then set the associated card
+        await loadCardsAndSetAssociated(cardId);
+      } else {
+        await loadCards();
+      }
     } catch (error: any) {
       console.error('Error loading draft perks:', error);
       toast({
@@ -107,9 +117,19 @@ export default function OCRConfirm() {
       if (response.ok) {
         const cards = await response.json();
         setCards(cards);
+        return cards;
       }
     } catch (error) {
       console.error('Error loading cards:', error);
+    }
+    return [];
+  };
+
+  const loadCardsAndSetAssociated = async (cardId: string) => {
+    const cards = await loadCards();
+    const associatedCard = cards.find((card: Card) => card.id === cardId);
+    if (associatedCard) {
+      setAssociatedCard(associatedCard);
     }
   };
 
@@ -221,10 +241,10 @@ export default function OCRConfirm() {
       return;
     }
 
-    if (!selectedCard) {
+    if (!associatedCard) {
       toast({
         title: "Card required",
-        description: "Please select a card to associate with these perks",
+        description: "No card associated with these perks. Please go back and select a card.",
         variant: "destructive",
       });
       return;
@@ -242,7 +262,7 @@ export default function OCRConfirm() {
         },
         body: JSON.stringify({
           perkIds: Array.from(selectedPerks),
-          cardId: selectedCard || null,
+          cardId: associatedCard.id,
         }),
       });
 
@@ -429,21 +449,40 @@ export default function OCRConfirm() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="card">Associated Card *</Label>
-                <Select value={selectedCard} onValueChange={setSelectedCard}>
-                  <SelectTrigger className={selectedCard ? '' : 'border-red-200'}>
-                    <SelectValue placeholder="Select a card (required)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cards.map(card => (
-                      <SelectItem key={card.id} value={card.id}>
-                        {card.name} {card.lastFourDigits && `(*${card.lastFourDigits})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Associated Card</Label>
+                <div className="mt-2">
+                  {associatedCard ? (
+                    <div className="flex items-center gap-3 p-3 bg-muted rounded-lg border">
+                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {associatedCard.name}
+                          {associatedCard.lastFourDigits && (
+                            <span className="text-muted-foreground ml-2">
+                              ••••{associatedCard.lastFourDigits}
+                            </span>
+                          )}
+                        </div>
+                        {associatedCard.issuer && (
+                          <div className="text-sm text-muted-foreground">
+                            {associatedCard.issuer} • {associatedCard.network}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="ml-auto">
+                        Pre-selected
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        No card associated. Please go back and select a card during upload.
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Required: Choose which card these perks belong to
+                  This card was selected during the upload process
                 </p>
               </div>
 
@@ -461,7 +500,7 @@ export default function OCRConfirm() {
 
               <Button
                 onClick={confirmPerks}
-                disabled={selectedPerks.size === 0 || !selectedCard || isConfirming}
+                disabled={selectedPerks.size === 0 || !associatedCard || isConfirming}
                 className="w-full"
               >
                 {isConfirming ? (
