@@ -1,127 +1,144 @@
 /**
- * Individual test for AMEX parser
- * This allows testing AMEX-specific logic in isolation
+ * Test AMEX parser with real OCR text from logs
+ * Expected to extract 4 perks from the screenshot
  */
+import { AmexParser } from './server/parsers/amex-parser.ts';
 
-console.log('🧪 Testing AMEX Parser\n');
+// Real OCR text from logs
+const ocrTextFromLogs = `4:36 \ al FT @)
+Offers
+Q
+8, Al © Shopping (1 Dining & Entertainme
+NEW
+Nordstrom & Nordstrom Rack -
+Clothes, Shoes, Beauty, and
+NORDSTROM more +
+Spend $80 or more, earn
+$15 back
+Expires 12/31/25
+CD Shake Shack
+Soo [Earn 20% back on asingle AL
+c——> purchase, up to a total of $8
+CD Expires 1112/25
+NEW
+Peacock
+peacock Spend $10.99 or more, earn =
+$10.99 back, up to 2 times
+(total of $21.98).
+Expires 12/26/25
+Walmart+ Annual Membership
+3 Spend $98 on Walmart+
+Walmart+2 Annual Membership, earn $49 AF
+back
+Expires 01/28/26
+NEW
+El Pollo Loco
+blo a. — +
+A © 8, 2
+Home Membership Offers Account
 
-// Mock AMEX parser logic for testing
-class MockAmexParser {
-  parseLines(lines) {
-    const perks = [];
-    let currentMerchant = '';
-    let currentOffer = '';
+OCR Confidence: 80`;
+
+console.log('=== AMEX Parser Test ===');
+console.log('Testing extraction of 4 perks from real OCR text');
+console.log('\nInput OCR text:');
+console.log(ocrTextFromLogs);
+
+const parser = new AmexParser();
+
+// Test preprocessing
+console.log('\n=== Preprocessing Debug ===');
+class DebugAmexParser extends AmexParser {
+  debugPreprocess(lines) {
+    const result = this.preprocessOCRText(lines);
+    console.log('Preprocessed lines:');
+    result.forEach((line, i) => console.log(`  ${i}: "${line}"`));
+    return result;
+  }
+  
+  debugShakeShack(lines) {
+    const fullText = lines.join('\n').trim();
+    const cleanLines = fullText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .filter(line => !this.isNavigationOrUI(line));
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      // Skip AMEX navigation
-      if (this.isAmexNavigation(line)) continue;
-      
-      // Check if this is a merchant
-      if (this.looksLikeMerchant(line)) {
-        // Save previous perk
-        if (currentMerchant && currentOffer) {
-          perks.push({
-            merchant: currentMerchant,
-            description: currentOffer,
-            value: this.extractValue(currentOffer),
-            confidence: 0.9
-          });
-        }
-        
-        currentMerchant = line;
-        currentOffer = '';
-      } else if (this.looksLikeOffer(line)) {
-        if (currentOffer) {
-          currentOffer += ' ' + line;
-        } else {
-          currentOffer = line;
-        }
-      }
+    console.log('\n=== Debugging Shake Shack extraction ===');
+    
+    const shakeBlock = {
+      merchantPattern: /Shake\s*Shack/i,
+      offerPattern: /earn\s*20%|20%\s*back/i,
+      name: 'Shake Shack'
+    };
+    
+    const merchantIndex = cleanLines.findIndex(line => shakeBlock.merchantPattern.test(line));
+    console.log(`Merchant index: ${merchantIndex}`);
+    if (merchantIndex !== -1) {
+      console.log(`Merchant line: "${cleanLines[merchantIndex]}"`);
     }
     
-    // Don't forget the last perk
-    if (currentMerchant && currentOffer) {
-      perks.push({
-        merchant: currentMerchant,
-        description: currentOffer,
-        value: this.extractValue(currentOffer),
-        confidence: 0.9
-      });
+    const offerIndex = cleanLines.findIndex((line, i) => 
+      i > merchantIndex && i < merchantIndex + 5 && shakeBlock.offerPattern.test(line)
+    );
+    console.log(`Offer index: ${offerIndex}`);
+    if (offerIndex !== -1) {
+      console.log(`Offer line: "${cleanLines[offerIndex]}"`);
     }
     
-    return perks;
-  }
-  
-  isAmexNavigation(line) {
-    const navElements = [
-      'american express', 'membership rewards', 'offers', 
-      'terms apply', 'enrollment required', 'limited time offer'
-    ];
-    const lower = line.toLowerCase();
-    return navElements.some(nav => lower.includes(nav));
-  }
-  
-  looksLikeMerchant(line) {
-    // AMEX merchants are typically clean single words or known brands
-    const trimmed = line.trim();
-    
-    if (trimmed.length < 3 || this.containsOfferKeywords(trimmed)) {
-      return false;
+    if (merchantIndex !== -1 && offerIndex !== -1) {
+      console.log('✅ Both merchant and offer found - should be extracted!');
+    } else {
+      console.log('❌ Missing merchant or offer');
     }
-    
-    // Common AMEX merchant patterns
-    return /^[A-Z][a-z]+$/.test(trimmed) || // "Amazon", "Target"
-           /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(trimmed); // "Best Buy"
-  }
-  
-  looksLikeOffer(line) {
-    return /earn\s+\d+|spend\s+\$\d+|get\s+\d+|\d+x\s*points|\d+\s*points/i.test(line);
-  }
-  
-  containsOfferKeywords(line) {
-    const keywords = ['earn', 'spend', 'get', 'points', 'offer'];
-    const lower = line.toLowerCase();
-    return keywords.some(keyword => lower.includes(keyword));
-  }
-  
-  extractValue(text) {
-    const pointsMatch = text.match(/(\d+[x]?\s*points?)/i);
-    const dollarMatch = text.match(/(\$\d+)/);
-    return pointsMatch?.[1] || dollarMatch?.[1] || 'N/A';
   }
 }
 
-// Test data
-const amexText = `
-American Express
-Membership Rewards
+const debugParser = new DebugAmexParser();
+const preprocessedLines = debugParser.debugPreprocess([ocrTextFromLogs.trim()]);
 
-Amazon
-Earn 5x points on purchases
-Terms apply
+// Debug specific Shake Shack extraction
+debugParser.debugShakeShack([ocrTextFromLogs.trim()]);
 
-Best Buy
-Spend $250 or more, get 2,500 points
-Enrollment required
+// Test full parsing
+console.log('\n=== Full Parsing Result ===');
+const result = parser.parseLines([ocrTextFromLogs.trim()]);
 
-Target
-3x points on all purchases
-
-Starbucks
-Get 10x points when you spend $25+
-Limited time offer
-`;
-
-const lines = amexText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-const parser = new MockAmexParser();
-const perks = parser.parseLines(lines);
-
-console.log(`Found ${perks.length} AMEX perks:`);
-perks.forEach((perk, index) => {
-  console.log(`${index + 1}. ${perk.merchant}: ${perk.value}`);
+console.log(`Found ${result.length} perks (expected: 4)`);
+console.log('\nParsed perks:');
+result.forEach((perk, i) => {
+  console.log(`\n${i + 1}. ${perk.merchant}`);
   console.log(`   Description: ${perk.description}`);
+  console.log(`   Value: ${perk.value}`);
+  console.log(`   Expiration: ${perk.expiration || 'None'}`);
+  console.log(`   Confidence: ${perk.confidence}`);
 });
 
-console.log('\n✅ AMEX parser logic works correctly!');
+// Expected perks based on screenshot:
+const expectedPerks = [
+  'Nordstrom & Nordstrom Rack',
+  'Shake Shack', 
+  'Peacock',
+  'Walmart+ Annual Membership'
+];
+
+console.log('\n=== Comparison ===');
+console.log('Expected merchants:', expectedPerks);
+console.log('Found merchants:', result.map(p => p.merchant));
+
+const missingPerks = expectedPerks.filter(expected => 
+  !result.some(found => found.merchant.toLowerCase().includes(expected.toLowerCase().split(' ')[0]))
+);
+
+if (missingPerks.length > 0) {
+  console.log('\n❌ Missing perks:', missingPerks);
+} else {
+  console.log('\n✅ All expected perks found!');
+}
+
+console.log('\n=== Status ===');
+if (result.length >= 4) {
+  console.log('✅ SUCCESS: Found 4 or more perks');
+} else {
+  console.log(`❌ FAILED: Only found ${result.length} perks, expected 4`);
+}

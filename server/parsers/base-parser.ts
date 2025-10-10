@@ -94,11 +94,11 @@ export abstract class BaseCardParser {
   }
 
   protected isExpirationLine(line: string): boolean {
-    return /expires|valid|until|through/i.test(line) && /\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{4}/i.test(line);
+    return /expires|valid|until|through/i.test(line) && /\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}\/\d{2,4}/i.test(line);
   }
 
   protected extractExpiration(line: string): string {
-    const match = line.match(/(\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{4})/);
+    const match = line.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}\/\d{2,4})/);
     return match ? match[1] : '';
   }
 

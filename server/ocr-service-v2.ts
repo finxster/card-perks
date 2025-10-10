@@ -8,12 +8,29 @@
  * - Provides both legacy and new APIs for backward compatibility
  */
 
-import * as Tesseract from 'tesseract.js';
-import { ExtractedPerk, OCRResult, CardType, BaseCardParser } from './parsers/base-parser';
+import Tesseract from 'tesseract.js';
+import { BaseCardParser } from './parsers/base-parser';
 import { ChaseParser } from './parsers/chase-parser';
 import { AmexParser } from './parsers/amex-parser';
 import { CitiParser } from './parsers/citi-parser';
 import { GenericParser } from './parsers/generic-parser';
+
+// Define types locally to avoid import issues
+export interface ExtractedPerk {
+  merchant: string;
+  description: string;
+  expiration?: string;
+  value?: string;
+  confidence: number;
+}
+
+export interface OCRResult {
+  text: string;
+  perks: ExtractedPerk[];
+  confidence: number;
+}
+
+export type CardType = 'chase' | 'amex' | 'citi' | 'capital_one' | 'discover' | 'wells_fargo' | 'bank_of_america' | 'unknown';
 
 export class OCRService {
   private parsers: Map<CardType, BaseCardParser>;
@@ -186,5 +203,4 @@ export class OCRService {
   }
 }
 
-// Re-export types for convenience
-export { ExtractedPerk, OCRResult, CardType } from './parsers/base-parser';
+// Types are defined above, no need to re-export

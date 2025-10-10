@@ -6,11 +6,14 @@ import jwt from "jsonwebtoken";
 import { randomBytes } from "crypto";
 import multer from "multer";
 import { insertUserSchema, insertCardSchema, insertPerkSchema, insertMerchantSchema, insertHouseholdSchema, insertCrowdsourcingSchema } from "@shared/schema";
-import { ocrService } from "./ocr-service";
+import { OCRService } from "./ocr-service-v2";
 import { createR2Service } from "./r2-service";
 
 const JWT_SECRET = process.env.JWT_SECRET || "cardperks-secret-key-change-in-production";
 const CLOUDFLARE_EMAIL_WORKER = "https://cardperks-email-proxy-dev.oieusouofinx.workers.dev";
+
+// Create OCR service instance with enhanced parsers
+const ocrService = new OCRService();
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -698,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const file of files) {
         try {
           // Process OCR on the image using card type for better accuracy
-          const ocrResult = await ocrService.processImageWithCardType(file.buffer, cardType);
+          const ocrResult = await ocrService.extractPerksFromImageWithCardType(file.buffer, cardType);
           
           // Upload image to R2 if service is available
           let imageUrl = '';
